@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -9,6 +10,8 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<!-- reCAPTCHA for Phone Auth -->
+<script src="https://www.gstatic.com/recaptcha/api.js" async defer></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
 :root{
@@ -48,17 +51,20 @@ html,body{width:100%;overflow-x:hidden;background:var(--bg);color:var(--text);fo
 .profile-dot{position:absolute;top:0;right:0;width:10px;height:10px;background:#16a34a;border-radius:50%;border:2px solid #fff;}
 
 /* PAGES — padded for fixed top bar */
-.page{display:none;padding:62px 0 68px 0;min-height:100vh;}
+.page{display:none;padding:62px 0 76px 0;min-height:100vh;}
 .page.active{display:block;}
 
 /* TAB BAR */
-.tab-bar{position:fixed;bottom:0;left:0;right:0;height:60px;background:#fff;border-top:1px solid var(--border);display:flex;z-index:100;box-shadow:0 -2px 8px rgba(0,0,0,0.06);}
-.tab-btn{flex:1;background:none;border:none;color:var(--muted);font-size:0.52rem;font-family:'Inter',sans-serif;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;cursor:pointer;transition:color 0.2s;font-weight:500;}
-.tab-btn .ticon{font-size:1.15rem;}
-.tab-btn.active{color:var(--accent);}
+.tab-bar{position:fixed;bottom:0;left:0;right:0;height:68px;background:#fff;border-top:none;display:flex;z-index:100;box-shadow:0 -4px 24px rgba(37,99,235,0.10);padding:0 6px 6px;}
+.tab-btn{flex:1;background:none;border:none;color:#9ca3af;font-size:0.58rem;font-family:'Inter',sans-serif;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;cursor:pointer;transition:all 0.2s;font-weight:600;border-radius:14px;margin:6px 3px 0;padding:6px 2px;letter-spacing:0.02em;position:relative;}
+.tab-btn .ticon{font-size:1.28rem;transition:transform 0.2s;}
+.tab-btn:active .ticon{transform:scale(0.88);}
+.tab-btn.active{color:#2563eb;background:linear-gradient(135deg,#eff4ff,#e0eaff);}
+.tab-btn.active .ticon{transform:scale(1.12);}
+.tab-btn.active::before{content:'';position:absolute;top:-6px;left:50%;transform:translateX(-50%);width:28px;height:3px;background:#2563eb;border-radius:0 0 4px 4px;}
 
 /* FAB */
-.fab{position:fixed;bottom:68px;right:16px;width:52px;height:52px;background:var(--accent);border-radius:50%;border:none;color:#fff;font-size:1.6rem;cursor:pointer;box-shadow:0 4px 16px rgba(37,99,235,0.35);z-index:150;display:none;align-items:center;justify-content:center;transition:transform 0.18s;}
+.fab{position:fixed;bottom:76px;right:16px;width:52px;height:52px;background:var(--accent);border-radius:50%;border:none;color:#fff;font-size:1.6rem;cursor:pointer;box-shadow:0 4px 16px rgba(37,99,235,0.35);z-index:150;display:none;align-items:center;justify-content:center;transition:transform 0.18s;}
 .fab:active{transform:scale(0.92);}
 .fab.show{display:flex;}
 
@@ -250,28 +256,129 @@ html,body{width:100%;overflow-x:hidden;background:var(--bg);color:var(--text);fo
 .prayer-cb.checked{background:#059669;border-color:#059669;color:#fff;}
 .task-total-val{font-size:0.88rem;font-weight:700;color:var(--accent);}
 /* TOAST */
-.toast{position:fixed;bottom:68px;left:50%;transform:translateX(-50%) translateY(16px);background:var(--text);color:#fff;padding:0.55rem 1.2rem;border-radius:20px;font-size:0.75rem;font-weight:500;white-space:nowrap;opacity:0;transition:all 0.28s cubic-bezier(0.34,1.56,0.64,1);z-index:300;pointer-events:none;}
+.toast{position:fixed;bottom:76px;left:50%;transform:translateX(-50%) translateY(16px);background:var(--text);color:#fff;padding:0.55rem 1.2rem;border-radius:20px;font-size:0.75rem;font-weight:500;white-space:nowrap;opacity:0;transition:all 0.28s cubic-bezier(0.34,1.56,0.64,1);z-index:300;pointer-events:none;}
 .toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
 
+/* EDIT MODAL */
+#editModal,#editOutModal{position:fixed;inset:0;z-index:9500;display:none;align-items:flex-end;justify-content:center;background:rgba(0,0,0,0.45);}
+#editModal.show,#editOutModal.show{display:flex;}
+.edit-modal-wrap{position:fixed;inset:0;z-index:9500;display:none;align-items:flex-end;justify-content:center;background:rgba(0,0,0,0.45);}
+.edit-modal-wrap.show{display:flex;}
+.edit-sheet{background:#fff;border-radius:20px 20px 0 0;padding:1.2rem 1rem 2rem;width:100%;max-width:480px;animation:slideUp 0.25s ease;}
+@keyframes slideUp{from{transform:translateY(100%);}to{transform:translateY(0);}}
+.edit-sheet-title{font-size:0.95rem;font-weight:700;color:var(--text);margin-bottom:1rem;display:flex;align-items:center;justify-content:space-between;}
+.edit-sheet-close{background:none;border:none;font-size:1.2rem;color:var(--muted);cursor:pointer;padding:4px;}
+.edit-field{margin-bottom:0.75rem;}
+.edit-field label{display:block;font-size:0.62rem;font-weight:600;text-transform:uppercase;letter-spacing:0.07em;color:var(--muted);margin-bottom:0.3rem;}
+.edit-field input,.edit-field select{width:100%;background:#f5f6fa;border:1.5px solid var(--border);border-radius:10px;padding:0.68rem 0.85rem;color:var(--text);font-family:'Inter',sans-serif;font-size:0.92rem;outline:none;-webkit-appearance:none;}
+.edit-field input:focus,.edit-field select:focus{border-color:var(--accent);background:#fff;}
+.edit-type-toggle{display:grid;grid-template-columns:1fr 1fr;background:var(--bg);border-radius:10px;padding:3px;gap:3px;margin-bottom:0.75rem;}
+.edit-type-btn{background:transparent;border:none;padding:0.6rem;border-radius:8px;font-size:0.82rem;font-weight:600;cursor:pointer;color:var(--muted);transition:all 0.18s;font-family:'Inter',sans-serif;}
+.edit-type-btn.active-income{background:#fff;color:var(--income);box-shadow:var(--shadow);}
+.edit-type-btn.active-expense{background:#fff;color:var(--expense);box-shadow:var(--shadow);}
+.edit-save-btn{width:100%;padding:0.85rem;border:none;border-radius:12px;background:var(--accent);color:#fff;font-family:'Inter',sans-serif;font-size:0.92rem;font-weight:600;cursor:pointer;margin-top:0.3rem;}
+.tx-edit{background:none;border:none;color:var(--accent);font-size:0.8rem;padding:5px 7px;cursor:pointer;border:1px solid var(--accent);border-radius:7px;margin-right:4px;font-family:Inter,sans-serif;font-weight:600;}
+.out-edit{background:none;border:none;color:var(--accent);font-size:0.78rem;padding:4px 6px;cursor:pointer;border:1px solid var(--accent);border-radius:7px;margin-right:2px;font-family:Inter,sans-serif;}
+
+/* PDF LINK BOXES */
+.pdf-grid{display:flex;flex-direction:column;gap:0.7rem;padding:0.85rem;}
+.pdf-box{background:#fff;border-radius:16px;padding:1.1rem 1rem;display:flex;align-items:center;gap:1rem;box-shadow:0 2px 10px rgba(37,99,235,0.10);cursor:pointer;transition:transform 0.15s,box-shadow 0.15s;border:1.5px solid #e2e5ed;min-height:72px;}
+.pdf-box:active{transform:scale(0.97);box-shadow:0 1px 4px rgba(0,0,0,0.08);}
+.pdf-box-icon{width:48px;height:48px;border-radius:13px;display:flex;align-items:center;justify-content:center;font-size:1.5rem;flex-shrink:0;}
+.pdf-box-body{flex:1;min-width:0;}
+.pdf-box-name{font-size:0.95rem;font-weight:700;color:#111827;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.pdf-box-sub{font-size:0.68rem;color:#6b7280;margin-top:3px;font-weight:500;}
+.pdf-box-arrow{font-size:1.1rem;color:#9ca3af;flex-shrink:0;}
+
 #reportCanvas{display:none;}
+
+/* LOGIN SCREEN */
+#pinScreen{position:fixed;inset:0;background:linear-gradient(160deg,#1e40af 0%,#2563eb 60%,#3b82f6 100%);z-index:10000;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:1.5rem;}
+#pinScreen.hide{display:none;}
+.pin-logo{width:76px;height:76px;background:#fff;border-radius:22px;display:flex;align-items:center;justify-content:center;font-size:2.2rem;box-shadow:0 8px 32px rgba(0,0,0,0.18);margin-bottom:1rem;}
+.pin-title{font-size:1.4rem;font-weight:700;color:#fff;margin-bottom:4px;}
+.pin-sub{font-size:0.78rem;color:rgba(255,255,255,0.75);margin-bottom:1.5rem;text-align:center;line-height:1.6;}
+.pin-status{font-size:0.78rem;color:rgba(255,255,255,0.85);min-height:1.4rem;margin-top:0.6rem;text-align:center;}
+.pin-newbadge{background:rgba(255,255,255,0.18);border-radius:20px;padding:0.3rem 1rem;font-size:0.7rem;color:rgba(255,255,255,0.9);margin-bottom:1.5rem;font-weight:600;}
+/* Phone input card */
+.otp-card{background:rgba(255,255,255,0.13);border:1.5px solid rgba(255,255,255,0.25);border-radius:20px;padding:1.4rem 1.2rem;width:100%;max-width:320px;backdrop-filter:blur(8px);}
+.otp-label{font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:rgba(255,255,255,0.75);margin-bottom:0.5rem;}
+.otp-phone-row{display:flex;align-items:center;background:rgba(255,255,255,0.95);border-radius:12px;overflow:hidden;margin-bottom:0.85rem;}
+.otp-prefix{padding:0 0.75rem;font-size:0.95rem;font-weight:700;color:#1e40af;border-right:1.5px solid #e2e5ed;height:48px;display:flex;align-items:center;flex-shrink:0;}
+.otp-phone-input{flex:1;border:none;outline:none;padding:0 0.75rem;font-size:1rem;font-weight:600;color:#111827;font-family:'Inter',sans-serif;height:48px;background:transparent;letter-spacing:0.06em;}
+.otp-phone-input::placeholder{color:#9ca3af;font-weight:400;letter-spacing:0;}
+.otp-send-btn{width:100%;padding:0.82rem;border:none;border-radius:12px;background:#fff;color:#2563eb;font-size:0.92rem;font-weight:700;cursor:pointer;font-family:'Inter',sans-serif;transition:opacity 0.18s;display:flex;align-items:center;justify-content:center;gap:8px;}
+.otp-send-btn:active{opacity:0.8;}
+.otp-send-btn:disabled{opacity:0.5;cursor:not-allowed;}
+/* OTP entry */
+.otp-boxes{display:flex;gap:10px;justify-content:center;margin-bottom:0.85rem;}
+.otp-box{width:44px;height:52px;background:rgba(255,255,255,0.95);border:2px solid transparent;border-radius:12px;text-align:center;font-size:1.4rem;font-weight:700;color:#1e40af;outline:none;font-family:'Inter',sans-serif;transition:border-color 0.18s;}
+.otp-box:focus{border-color:#fff;box-shadow:0 0 0 3px rgba(255,255,255,0.3);}
+.otp-verify-btn{width:100%;padding:0.82rem;border:none;border-radius:12px;background:#fff;color:#16a34a;font-size:0.92rem;font-weight:700;cursor:pointer;font-family:'Inter',sans-serif;transition:opacity 0.18s;display:flex;align-items:center;justify-content:center;gap:8px;}
+.otp-verify-btn:active{opacity:0.8;}
+.otp-verify-btn:disabled{opacity:0.5;cursor:not-allowed;}
+.otp-back-link{text-align:center;margin-top:0.85rem;font-size:0.75rem;color:rgba(255,255,255,0.75);cursor:pointer;text-decoration:underline;}
+.otp-resend{text-align:center;margin-top:0.6rem;font-size:0.72rem;color:rgba(255,255,255,0.7);}
+.otp-resend span{color:#fff;font-weight:600;cursor:pointer;text-decoration:underline;}
+/* Recaptcha container — hidden but needed */
+#recaptcha-container{display:none;}
+@keyframes spin{from{transform:rotate(0deg);}to{transform:rotate(360deg);}}
 </style>
 </head>
 <body>
 
-<!-- SPLASH -->
-<!-- LOGIN OVERLAY -->
-<div id="loginOverlay" style="position:fixed;inset:0;background:#2563eb;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:99999;padding:2rem;">
-  <div style="background:#fff;border-radius:24px;padding:2rem 1.5rem;width:100%;max-width:360px;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,0.25);">
-    <div style="width:68px;height:68px;background:#eff4ff;border-radius:18px;display:flex;align-items:center;justify-content:center;font-size:2rem;margin:0 auto 1rem;">💰</div>
-    <div style="font-size:1.3rem;font-weight:700;color:#111827;margin-bottom:0.3rem;">Expense Tracker</div>
-    <div style="font-size:0.78rem;color:#6b7280;margin-bottom:1.5rem;">by ABDUL AJEEZ</div>
-    <button id="googleSignInBtn" onclick="signInWithGoogle()" style="width:100%;padding:0.85rem;border:2px solid #e2e5ed;border-radius:12px;background:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:0.65rem;font-size:0.9rem;font-weight:600;color:#374151;font-family:Inter,sans-serif;transition:all 0.2s;">
-      <svg width="20" height="20" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.18 1.48-4.97 2.31-8.16 2.31-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
-      Sign in with Google
+
+<!-- OTP LOGIN SCREEN -->
+<div id="pinScreen">
+  <div class="pin-logo">💰</div>
+  <div class="pin-title">Expense Tracker</div>
+  <div class="pin-sub" id="pinSubText">உங்கள் Phone Number போடுங்க<br/>OTP வரும் — verify பண்ணுங்க</div>
+
+  <!-- STEP 1: Phone Number Entry -->
+  <div class="otp-card" id="stepPhone">
+    <div class="otp-label">📱 Mobile Number</div>
+    <div class="otp-phone-row">
+      <div class="otp-prefix">🇮🇳 +91</div>
+      <input class="otp-phone-input" id="phoneInput" type="tel" inputmode="numeric"
+        maxlength="10" placeholder="98765 43210"
+        oninput="this.value=this.value.replace(/\D/g,'')" onkeydown="if(event.key==='Enter')sendOTP()"/>
+    </div>
+    <button class="otp-send-btn" id="sendOtpBtn" onclick="sendOTP()">
+      📲 OTP அனுப்பு
     </button>
-    <div id="loginStatus" style="margin-top:1rem;font-size:0.75rem;color:#6b7280;min-height:18px;"></div>
+    <div class="pin-status" id="pinStatus"></div>
   </div>
-  <div style="margin-top:1.5rem;font-size:0.68rem;color:rgba(255,255,255,0.6);">Your data is securely synced with Firebase</div>
+
+  <!-- STEP 2: OTP Entry -->
+  <div class="otp-card" id="stepOTP" style="display:none;">
+    <div class="otp-label">🔐 Enter OTP</div>
+    <div style="font-size:0.72rem;color:rgba(255,255,255,0.8);margin-bottom:0.85rem;" id="otpSentTo"></div>
+    <div class="otp-boxes">
+      <input class="otp-box" id="o0" maxlength="1" inputmode="numeric" type="tel"/>
+      <input class="otp-box" id="o1" maxlength="1" inputmode="numeric" type="tel"/>
+      <input class="otp-box" id="o2" maxlength="1" inputmode="numeric" type="tel"/>
+      <input class="otp-box" id="o3" maxlength="1" inputmode="numeric" type="tel"/>
+      <input class="otp-box" id="o4" maxlength="1" inputmode="numeric" type="tel"/>
+      <input class="otp-box" id="o5" maxlength="1" inputmode="numeric" type="tel"/>
+    </div>
+    <button class="otp-verify-btn" id="verifyOtpBtn" onclick="verifyOTP()">
+      ✅ Verify &amp; Login
+    </button>
+    <div class="pin-status" id="otpStatus"></div>
+    <div class="otp-resend" id="resendWrap">
+      <span id="resendTimer">⏳ 30s-ல் Resend கிடைக்கும்</span>
+    </div>
+    <div class="otp-back-link" onclick="backToPhone()">← வேற number போடு</div>
+  </div>
+
+  <!-- Loading state -->
+  <div id="stepLoading" style="display:none;flex-direction:column;align-items:center;gap:1rem;margin-top:1rem;">
+    <div style="width:52px;height:52px;border:4px solid rgba(255,255,255,0.25);border-top:4px solid #fff;border-radius:50%;animation:spin 0.9s linear infinite;"></div>
+    <div class="pin-status" id="loadingStatus" style="color:rgba(255,255,255,0.9);"></div>
+  </div>
+
+  <!-- Invisible reCAPTCHA container -->
+  <div id="recaptcha-container"></div>
 </div>
 
 <div id="splash">
@@ -280,6 +387,43 @@ html,body{width:100%;overflow-x:hidden;background:var(--bg);color:var(--text);fo
   <div class="splash-tag">PERSONAL FINANCE</div>
   <div class="splash-bar"><div class="splash-bar-fill"></div></div>
   <div class="splash-credit">Created by ABDUL AJEEZ</div>
+</div>
+
+<!-- EDIT TRANSACTION MODAL -->
+<div id="editModal">
+  <div class="edit-sheet">
+    <div class="edit-sheet-title">
+      <span>✏️ Edit Transaction</span>
+      <button class="edit-sheet-close" onclick="closeEditModal()">✕</button>
+    </div>
+    <div class="edit-type-toggle">
+      <button class="edit-type-btn active-income" id="editBtnIncome" onclick="setEditType('income')">▲ Income</button>
+      <button class="edit-type-btn" id="editBtnExpense" onclick="setEditType('expense')">▼ Expense</button>
+    </div>
+    <div class="edit-field"><label>Description</label><input type="text" id="editDesc" placeholder="Description"/></div>
+    <div class="edit-field"><label>Amount (₹)</label><input type="number" id="editAmount" placeholder="0" inputmode="decimal"/></div>
+    <div class="edit-field"><label>Category</label><select id="editCategory"></select></div>
+    <div class="edit-field"><label>Date</label><input type="date" id="editDate"/></div>
+    <button class="edit-save-btn" onclick="saveEditTransaction()">💾 Save Changes</button>
+  </div>
+</div>
+
+<!-- EDIT OUTSTANDING MODAL -->
+<div id="editOutModal" class="edit-modal-wrap">
+  <div class="edit-sheet">
+    <div class="edit-sheet-title">
+      <span>✏️ Edit Outstanding</span>
+      <button class="edit-sheet-close" onclick="closeEditOutModal()">✕</button>
+    </div>
+    <div class="edit-field"><label>Name</label><input type="text" id="editOutName" placeholder="Person / Party Name"/></div>
+    <div class="edit-field"><label>Description</label><input type="text" id="editOutDesc" placeholder="Description (e.g. Rent due)"/></div>
+    <div class="edit-field"><label>Amount (₹)</label><input type="number" id="editOutAmt" placeholder="0" inputmode="decimal"/></div>
+    <div class="edit-type-toggle">
+      <button class="edit-type-btn" id="editOutBtnAdd" onclick="setEditOutMode('add')" style="color:#16a34a;">➕ Add</button>
+      <button class="edit-type-btn" id="editOutBtnDeduct" onclick="setEditOutMode('deduct')" style="color:#dc2626;">➖ Deduct</button>
+    </div>
+    <button class="edit-save-btn" onclick="saveEditOutstanding()">💾 Save Changes</button>
+  </div>
 </div>
 
 <!-- CONFIRM MODAL -->
@@ -313,16 +457,17 @@ html,body{width:100%;overflow-x:hidden;background:var(--bg);color:var(--text);fo
         <div class="avatar-edit">✏️</div>
       </div>
       <input class="drawer-name-input" id="drawerNameInput" value="My Name" onchange="saveName()"/>
-      <div class="drawer-sub">Expense Tracker</div>
+      <div class="drawer-sub" id="drawerUID">📱 Phone Login</div>
       <div class="drawer-credit">Created by ABDUL AJEEZ</div>
     </div>
     <div class="drawer-menu">
       <div class="drawer-item" onclick="closeProfile();switchTab('home')"><span class="di">🏠</span>Home</div>
       <div class="drawer-item" onclick="closeProfile();switchTab('add')"><span class="di">➕</span>Add Transaction</div>
       <div class="drawer-item" onclick="closeProfile();switchTab('stats')"><span class="di">📊</span>Analytics</div>
-      <div class="drawer-item" onclick="closeProfile();switchTab('docs');triggerUpload()"><span class="di">📤</span>Upload Document</div>
-      <div class="drawer-item" onclick="closeProfile();switchTab('bank')"><span class="di">🏦</span>Bank Accounts</div>
-      <div class="drawer-item" onclick="closeProfile();switchTab('outstanding')"><span class="di">📋</span>Outstanding</div>
+      <div class="drawer-item" onclick="closeProfile();switchTab('docs')"><span class="di">📁</span>Documents</div>
+      <div class="drawer-item" onclick="closeProfile();switchTab('outstanding')"><span class="di">🔔</span>Outstanding / Due</div>
+      <div class="drawer-item" onclick="closeProfile();switchTab('settings')"><span class="di">⚙️</span>Settings & Backup</div>
+      <div class="drawer-item" onclick="signOut()"><span class="di">🔑</span>Logout</div>
       <div class="drawer-divider"></div>
       <div class="drawer-item" onclick="closeProfile();downloadReportImage()"><span class="di">🖼️</span>Download Report Image</div>
       <div class="drawer-item" onclick="closeProfile();shareReportText()"><span class="di">📤</span>Share Report (WhatsApp)</div>
@@ -354,9 +499,10 @@ html,body{width:100%;overflow-x:hidden;background:var(--bg);color:var(--text);fo
       <div class="s-card inc"><div class="lbl">Income</div><div class="val" id="totalIncome">₹0</div><div class="cnt" id="incomeCount">0</div></div>
       <div class="s-card exp"><div class="lbl">Expense</div><div class="val" id="totalExpense">₹0</div><div class="cnt" id="expenseCount">0</div></div>
     </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.5rem;padding:0 0.8rem 0.5rem;">
-      <button style="padding:0.65rem;border:none;border-radius:11px;background:#2563eb;color:#fff;font-size:0.78rem;font-weight:600;cursor:pointer;font-family:Inter,sans-serif;" onclick="downloadReportImage()">&#128444;&#65039; Download Report</button>
-      <button style="padding:0.65rem;border:none;border-radius:11px;background:#25d366;color:#fff;font-size:0.78rem;font-weight:600;cursor:pointer;font-family:Inter,sans-serif;" onclick="shareReportText()">&#128228; Share WhatsApp</button>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:0.5rem;padding:0 0.8rem 0.5rem;">
+      <button style="padding:0.65rem;border:none;border-radius:11px;background:#2563eb;color:#fff;font-size:0.73rem;font-weight:600;cursor:pointer;font-family:Inter,sans-serif;" onclick="downloadReportImage()">🖼️ Image</button>
+      <button style="padding:0.65rem;border:none;border-radius:11px;background:#dc2626;color:#fff;font-size:0.73rem;font-weight:600;cursor:pointer;font-family:Inter,sans-serif;" onclick="downloadReportPDF()">📄 PDF</button>
+      <button style="padding:0.65rem;border:none;border-radius:11px;background:#25d366;color:#fff;font-size:0.73rem;font-weight:600;cursor:pointer;font-family:Inter,sans-serif;" onclick="shareReportText()">📤 Share</button>
     </div>
     <div class="sec-title">Recent Transactions</div>
     <div class="filter-row">
@@ -391,17 +537,20 @@ html,body{width:100%;overflow-x:hidden;background:var(--bg);color:var(--text);fo
       <button class="atab" onclick="setAnalyticsTab('datewise',this)">Date-wise</button>
     </div>
     <div class="report-action">
-      <button class="rpt-btn rpt-img" onclick="downloadReportImage()">🖼️ Download Image</button>
-      <button class="rpt-btn rpt-share" onclick="shareReportText()">📤 Share WhatsApp</button>
+      <button class="rpt-btn rpt-img" onclick="downloadReportImage()">🖼️ Image</button>
+      <button class="rpt-btn" style="background:#dc2626;color:#fff;" onclick="downloadReportPDF()">📄 PDF</button>
+      <button class="rpt-btn rpt-share" onclick="shareReportText()">📤 WhatsApp</button>
     </div>
     <div id="analyticsContent"></div>
   </div>
 
   <!-- DOCUMENTS -->
   <div class="page" id="page-docs">
-    <div class="docs-wrap">
-      <div class="doc-list" id="docList"></div>
+    <div style="padding:0.7rem 0.85rem 0.3rem;display:flex;align-items:center;justify-content:space-between;">
+      <div style="font-size:1rem;font-weight:700;color:var(--text);">📁 My Documents</div>
+      <div style="font-size:0.68rem;color:var(--muted);">Tap to open PDF</div>
     </div>
+    <div class="pdf-grid" id="pdfBoxGrid"></div>
   </div>
 
   <!-- BANK ACCOUNTS -->
@@ -414,6 +563,9 @@ html,body{width:100%;overflow-x:hidden;background:var(--bg);color:var(--text);fo
     <div class="outstanding-wrap">
       <div class="out-form">
         <div class="out-form-title">Outstanding Tracker</div>
+        <div class="out-row">
+          <input class="out-input" id="outName" placeholder="Name (e.g. Ravi, Shop)"/>
+        </div>
         <div class="out-row">
           <input class="out-input" id="outDesc" placeholder="Description (e.g. Rent due)"/>
         </div>
@@ -431,7 +583,10 @@ html,body{width:100%;overflow-x:hidden;background:var(--bg);color:var(--text);fo
           <span class="out-total-label">Total Outstanding</span>
           <span class="out-total-val" id="outTotalVal">₹0</span>
         </div>
-        <button class="out-share-btn" onclick="shareOutstanding()">📤 Share Outstanding List</button>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.5rem;">
+          <button class="out-share-btn" onclick="shareOutstanding()">📤 WhatsApp Text</button>
+          <button class="out-share-btn" onclick="shareOutstandingImage()" style="background:#1d4ed8;">🖼️ Image Share</button>
+        </div>
       </div>
     </div>
   </div>
@@ -458,16 +613,87 @@ html,body{width:100%;overflow-x:hidden;background:var(--bg);color:var(--text);fo
     </div>
   </div>
 
+  <!-- SETTINGS PAGE -->
+  <div class="page" id="page-settings">
+    <div style="padding:1rem 0.85rem 0;">
+
+      <!-- Header card -->
+      <div style="background:linear-gradient(135deg,#2563eb,#1e40af);border-radius:16px;padding:1.2rem;color:#fff;margin-bottom:1.2rem;text-align:center;">
+        <div style="font-size:2rem;margin-bottom:0.4rem;">⚙️</div>
+        <div style="font-size:1rem;font-weight:700;">Settings & Backup</div>
+        <div style="font-size:0.72rem;opacity:0.8;margin-top:4px;">உங்கள் data backup & restore பண்ணுங்க</div>
+        <div style="font-size:0.66rem;opacity:0.65;margin-top:6px;" id="settingsUID">📱 Phone Auth</div>
+      </div>
+
+      <!-- EXPORT SECTION -->
+      <div style="background:#fff;border:1.5px solid #e2e5ed;border-radius:16px;padding:1.1rem;margin-bottom:0.85rem;box-shadow:0 2px 10px rgba(37,99,235,0.07);">
+        <div style="font-size:0.75rem;font-weight:700;color:#2563eb;text-transform:uppercase;letter-spacing:0.07em;margin-bottom:0.85rem;">📤 Export — Backup எடுங்க</div>
+
+        <!-- Option 1: Download -->
+        <button onclick="exportDownload()" style="width:100%;padding:0.85rem;border:none;border-radius:12px;background:#2563eb;color:#fff;font-size:0.88rem;font-weight:700;cursor:pointer;font-family:Inter,sans-serif;margin-bottom:0.6rem;display:flex;align-items:center;justify-content:center;gap:8px;">
+          📥 Download JSON File
+        </button>
+
+        <!-- Option 2: Google Drive -->
+        <button onclick="exportToDrive()" style="width:100%;padding:0.85rem;border:none;border-radius:12px;background:#16a34a;color:#fff;font-size:0.88rem;font-weight:700;cursor:pointer;font-family:Inter,sans-serif;margin-bottom:0.6rem;display:flex;align-items:center;justify-content:center;gap:8px;">
+          ☁️ Google Drive-ல் Save பண்ணு
+        </button>
+
+        <!-- Option 3: WhatsApp -->
+        <button onclick="exportWhatsApp()" style="width:100%;padding:0.85rem;border:none;border-radius:12px;background:#25d366;color:#fff;font-size:0.88rem;font-weight:700;cursor:pointer;font-family:Inter,sans-serif;display:flex;align-items:center;justify-content:center;gap:8px;">
+          💬 WhatsApp-ல் Share பண்ணு
+        </button>
+      </div>
+
+      <!-- IMPORT SECTION -->
+      <div style="background:#fff;border:1.5px solid #e2e5ed;border-radius:16px;padding:1.1rem;margin-bottom:0.85rem;box-shadow:0 2px 10px rgba(37,99,235,0.07);">
+        <div style="font-size:0.75rem;font-weight:700;color:#d97706;text-transform:uppercase;letter-spacing:0.07em;margin-bottom:0.85rem;">📂 Import — Data திரும்ப போடுங்க</div>
+
+        <div style="background:#fef9ec;border-radius:10px;padding:0.75rem;margin-bottom:0.85rem;font-size:0.72rem;color:#92400e;line-height:1.7;">
+          ⚠️ Import பண்ணா இப்போ இருக்கற data replace ஆகும்
+        </div>
+
+        <!-- Import from file -->
+        <button onclick="document.getElementById('importFileInput').click()" style="width:100%;padding:0.85rem;border:none;border-radius:12px;background:#d97706;color:#fff;font-size:0.88rem;font-weight:700;cursor:pointer;font-family:Inter,sans-serif;margin-bottom:0.6rem;display:flex;align-items:center;justify-content:center;gap:8px;">
+          📂 JSON File Import பண்ணு
+        </button>
+        <input type="file" id="importFileInput" accept=".json,application/json,text/plain,*/*" onchange="importData(event)" style="display:none;"/>
+
+        <!-- Import from text paste -->
+        <button onclick="importFromText()" style="width:100%;padding:0.85rem;border:1.5px solid #d97706;border-radius:12px;background:#fff;color:#d97706;font-size:0.88rem;font-weight:700;cursor:pointer;font-family:Inter,sans-serif;display:flex;align-items:center;justify-content:center;gap:8px;">
+          📋 WhatsApp-லிருந்து Paste பண்ணு
+        </button>
+      </div>
+
+      <!-- HOW TO USE -->
+      <div style="background:#f8faff;border:1.5px solid #e0eaff;border-radius:16px;padding:1rem;margin-bottom:1rem;">
+        <div style="font-size:0.78rem;font-weight:700;color:#2563eb;margin-bottom:0.6rem;">📋 எப்படி use பண்றது:</div>
+        <div style="font-size:0.72rem;color:#374151;line-height:1.9;">
+          <b>Method 1 — WhatsApp (Easiest):</b><br/>
+          1️⃣ WhatsApp Share button click<br/>
+          2️⃣ உங்களுக்கே "Saved Messages"-ல் send<br/>
+          3️⃣ New phone-ல் அந்த text copy<br/>
+          4️⃣ "Paste பண்ணு" button click → Done ✅<br/><br/>
+          <b>Method 2 — Google Drive:</b><br/>
+          1️⃣ Drive button click → link copy ஆகும்<br/>
+          2️⃣ Drive-ல் New Google Doc → paste<br/>
+          3️⃣ New phone-ல் copy → Paste button ✅
+        </div>
+      </div>
+
+    </div>
+  </div>
+
   <!-- FAB -->
   <button class="fab show" id="fab" onclick="switchTab('add')">+</button>
 
   <!-- TAB BAR -->
   <nav class="tab-bar">
     <button class="tab-btn active" id="tab-home" onclick="switchTab('home')"><span class="ticon">🏠</span>Home</button>
-    <button class="tab-btn" id="tab-task" onclick="switchTab('task')"><span class="ticon">📋</span>Task</button>
+    <button class="tab-btn" id="tab-task" onclick="switchTab('task')"><span class="ticon">📊</span>Task</button>
     <button class="tab-btn" id="tab-docs" onclick="switchTab('docs')"><span class="ticon">📁</span>Docs</button>
     <button class="tab-btn" id="tab-bank" onclick="switchTab('bank')"><span class="ticon">🏦</span>Bank</button>
-    <button class="tab-btn" id="tab-outstanding" onclick="switchTab('outstanding')"><span class="ticon">📋</span>Due</button>
+    <button class="tab-btn" id="tab-outstanding" onclick="switchTab('outstanding')"><span class="ticon">🔔</span>Outstanding</button>
   </nav>
 </div>
 
@@ -476,7 +702,7 @@ html,body{width:100%;overflow-x:hidden;background:var(--bg);color:var(--text);fo
 
 <script>
 // ============================================================
-// FIREBASE INIT
+// FIREBASE INIT — Phone Number Authentication
 // ============================================================
 const firebaseConfig = {
   apiKey: "AIzaSyBEiRyAKnV907tkquTRfh3fxnzoIy3Jitc",
@@ -487,87 +713,377 @@ const firebaseConfig = {
   messagingSenderId: "34384531855",
   appId: "1:34384531855:web:09a7ce94f1bb105b223bfa"
 };
-firebase.initializeApp(firebaseConfig);
-const auth = firebase.auth();
-const db = firebase.database();
-let currentUser = null;
-let syncTimeout = null;
 
-function signInWithGoogle(){
-  document.getElementById('loginStatus').textContent = 'Signing in...';
-  const provider = new firebase.auth.GoogleAuthProvider();
-  auth.signInWithPopup(provider).catch(err=>{
-    document.getElementById('loginStatus').textContent = 'Error: '+err.message;
-  });
+let db = null;
+let auth = null;
+let syncTimeout = null;
+let userPhone = null;
+let confirmationResult = null;
+let recaptchaVerifier = null;
+let resendTimerInterval = null;
+
+try {
+  firebase.initializeApp(firebaseConfig);
+  db = firebase.database();
+  auth = firebase.auth();
+} catch(e) {}
+
+// ============================================================
+// OTP — STEP 1: Send OTP
+// ============================================================
+function initRecaptcha(){
+  if(!auth) return;
+  try {
+    // Already initialized and valid — reuse it
+    if(recaptchaVerifier) return;
+    recaptchaVerifier = new firebase.auth.RecaptchaVerifier('recaptcha-container', {
+      'size': 'invisible',
+      'callback': () => {}
+    });
+    recaptchaVerifier.render();
+  } catch(e){
+    recaptchaVerifier = null;
+  }
 }
-function signOut(){
-  auth.signOut();
-  closeDrawer();
+
+function sendOTP(){
+  const raw = document.getElementById('phoneInput').value.trim();
+  const statusEl = document.getElementById('pinStatus');
+
+  if(raw.length !== 10){
+    statusEl.style.color = '#fca5a5';
+    statusEl.textContent = '⚠️ 10 digit number போடுங்க!';
+    return;
+  }
+  if(!/^[6-9]/.test(raw)){
+    statusEl.style.color = '#fca5a5';
+    statusEl.textContent = '⚠️ Valid Indian mobile number போடுங்க!';
+    return;
+  }
+
+  const phoneNumber = '+91' + raw;
+
+  if(!auth){
+    statusEl.style.color = '#fca5a5';
+    statusEl.textContent = '⚠️ Firebase இல்ல — offline mode';
+    return;
+  }
+
+  if(!recaptchaVerifier){
+    statusEl.style.color = '#fca5a5';
+    statusEl.textContent = '⚠️ reCAPTCHA ready இல்ல — page refresh பண்ணு';
+    return;
+  }
+
+  const btn = document.getElementById('sendOtpBtn');
+  btn.disabled = true;
+  statusEl.style.color = 'rgba(255,255,255,0.9)';
+  statusEl.textContent = '🔄 OTP அனுப்புகிறோம்...';
+
+  auth.signInWithPhoneNumber(phoneNumber, recaptchaVerifier)
+    .then(result => {
+      confirmationResult = result;
+      showOTPStep(raw);
+    })
+    .catch(err => {
+      btn.disabled = false;
+      statusEl.style.color = '#fca5a5';
+      if(err.code === 'auth/invalid-phone-number'){
+        statusEl.textContent = '⚠️ Invalid phone number!';
+      } else if(err.code === 'auth/too-many-requests'){
+        statusEl.textContent = '⚠️ Too many attempts — கொஞ்சம் wait பண்ணு';
+      } else if(err.code === 'auth/captcha-check-failed'){
+        statusEl.textContent = '⚠️ reCAPTCHA error — page refresh பண்ணு';
+      } else {
+        statusEl.textContent = '⚠️ Error: ' + (err.message || 'Try again');
+      }
+      // Reset recaptcha on error so next attempt works
+      try { recaptchaVerifier.clear(); } catch(e){}
+      recaptchaVerifier = null;
+      // Re-init fresh recaptcha
+      setTimeout(() => initRecaptcha(), 500);
+    });
 }
-function getUserRef(path){
-  return db.ref('users/'+currentUser.uid+'/'+path);
+
+function showOTPStep(phoneRaw){
+  document.getElementById('stepPhone').style.display = 'none';
+  document.getElementById('stepOTP').style.display = 'block';
+  document.getElementById('otpSentTo').textContent = '📨 +91 ' + phoneRaw + '-க்கு OTP அனுப்பினோம்';
+  // Focus first box
+  setTimeout(() => document.getElementById('o0').focus(), 300);
+  // Setup OTP box navigation
+  setupOTPBoxes();
+  // Start resend timer
+  startResendTimer();
 }
+
+function setupOTPBoxes(){
+  for(let i = 0; i < 6; i++){
+    const box = document.getElementById('o'+i);
+    box.value = '';
+    box.oninput = function(){
+      this.value = this.value.replace(/\D/g,'').slice(0,1);
+      if(this.value && i < 5) document.getElementById('o'+(i+1)).focus();
+      // Auto verify when all 6 filled
+      if(getOTPValue().length === 6) verifyOTP();
+    };
+    box.onkeydown = function(e){
+      if(e.key === 'Backspace' && !this.value && i > 0){
+        document.getElementById('o'+(i-1)).focus();
+      }
+    };
+    // Handle paste
+    box.onpaste = function(e){
+      e.preventDefault();
+      const text = (e.clipboardData || window.clipboardData).getData('text').replace(/\D/g,'').slice(0,6);
+      for(let j = 0; j < text.length && j < 6; j++){
+        document.getElementById('o'+j).value = text[j];
+      }
+      if(text.length > 0) document.getElementById('o'+(Math.min(text.length,5))).focus();
+      if(text.length === 6) setTimeout(verifyOTP, 200);
+    };
+  }
+}
+
+function getOTPValue(){
+  let val = '';
+  for(let i = 0; i < 6; i++) val += (document.getElementById('o'+i).value || '');
+  return val;
+}
+
+// ============================================================
+// OTP — STEP 2: Verify OTP
+// ============================================================
+function verifyOTP(){
+  const code = getOTPValue();
+  const statusEl = document.getElementById('otpStatus');
+
+  if(code.length !== 6){
+    statusEl.style.color = '#fca5a5';
+    statusEl.textContent = '⚠️ 6 digit OTP முழுசா போடுங்க!';
+    return;
+  }
+  if(!confirmationResult){
+    statusEl.style.color = '#fca5a5';
+    statusEl.textContent = '⚠️ Session expire — மீண்டும் try பண்ணு';
+    return;
+  }
+
+  const btn = document.getElementById('verifyOtpBtn');
+  btn.disabled = true;
+  statusEl.style.color = 'rgba(255,255,255,0.9)';
+  statusEl.textContent = '🔄 Verifying...';
+
+  confirmationResult.confirm(code)
+    .then(result => {
+      const user = result.user;
+      userPhone = user.phoneNumber; // +91xxxxxxxxxx
+      localStorage.setItem('exp_uid', userPhone);
+      localStorage.setItem('exp_phone', userPhone);
+
+      statusEl.style.color = '#86efac';
+      statusEl.textContent = '✅ Login ஆச்சு! உள்ளே போகிறோம்...';
+
+      clearInterval(resendTimerInterval);
+      setTimeout(() => enterApp(), 700);
+    })
+    .catch(err => {
+      btn.disabled = false;
+      statusEl.style.color = '#fca5a5';
+      if(err.code === 'auth/invalid-verification-code'){
+        statusEl.textContent = '⚠️ Wrong OTP! மீண்டும் try பண்ணு';
+      } else if(err.code === 'auth/code-expired'){
+        statusEl.textContent = '⚠️ OTP expire ஆச்சு! Resend பண்ணு';
+      } else {
+        statusEl.textContent = '⚠️ Error — மீண்டும் try பண்ணு';
+      }
+      // Shake effect
+      for(let i=0;i<6;i++){
+        const b=document.getElementById('o'+i);
+        b.style.borderColor='#fca5a5';
+        setTimeout(()=>b.style.borderColor='transparent',1500);
+      }
+    });
+}
+
+function backToPhone(){
+  clearInterval(resendTimerInterval);
+  document.getElementById('stepOTP').style.display = 'none';
+  document.getElementById('stepPhone').style.display = 'block';
+  document.getElementById('sendOtpBtn').disabled = false;
+  document.getElementById('pinStatus').textContent = '';
+  confirmationResult = null;
+}
+
+function startResendTimer(){
+  let secs = 30;
+  const el = document.getElementById('resendTimer');
+  clearInterval(resendTimerInterval);
+  el.innerHTML = '⏳ ' + secs + 's-ல் Resend கிடைக்கும்';
+
+  resendTimerInterval = setInterval(() => {
+    secs--;
+    if(secs <= 0){
+      clearInterval(resendTimerInterval);
+      el.innerHTML = '<span onclick="resendOTP()">🔁 OTP மீண்டும் அனுப்பு</span>';
+    } else {
+      el.innerHTML = '⏳ ' + secs + 's-ல் Resend கிடைக்கும்';
+    }
+  }, 1000);
+}
+
+function resendOTP(){
+  clearInterval(resendTimerInterval);
+  document.getElementById('stepOTP').style.display = 'none';
+  document.getElementById('stepPhone').style.display = 'block';
+  document.getElementById('sendOtpBtn').disabled = false;
+  document.getElementById('pinStatus').textContent = '';
+  confirmationResult = null;
+  // Auto trigger send
+  setTimeout(() => sendOTP(), 200);
+}
+
+// ============================================================
+// INIT PIN SCREEN — Check if already logged in
+// ============================================================
+function initPinScreen(){
+  // Check if already signed in via Firebase
+  if(auth){
+    const cachedPhone = localStorage.getItem('exp_phone');
+    // Use onAuthStateChanged to check existing session
+    auth.onAuthStateChanged(user => {
+      if(user && user.phoneNumber){
+        // Already logged in — skip OTP
+        userPhone = user.phoneNumber;
+        localStorage.setItem('exp_uid', userPhone);
+        localStorage.setItem('exp_phone', userPhone);
+        showLoadingState('✅ Welcome back! உள்ளே போகிறோம்...');
+        setTimeout(() => enterApp(), 800);
+      } else if(cachedPhone && cachedPhone.startsWith('+91')){
+        // Cached phone but session expired — show phone screen with prefilled
+        const digits = cachedPhone.replace('+91','');
+        document.getElementById('phoneInput').value = digits;
+        document.getElementById('pinStatus').style.color = 'rgba(255,255,255,0.7)';
+        document.getElementById('pinStatus').textContent = '🔒 Session expire ஆச்சு — மீண்டும் login பண்ணுங்க';
+      }
+      // else: show phone entry normally (default state)
+    });
+  }
+}
+
+function showLoadingState(msg){
+  document.getElementById('stepPhone').style.display = 'none';
+  document.getElementById('stepOTP').style.display = 'none';
+  document.getElementById('stepLoading').style.display = 'flex';
+  document.getElementById('loadingStatus').textContent = msg;
+}
+
+function enterApp(){
+  document.getElementById('pinScreen').classList.add('hide');
+  // Update settings page UID display
+  const suid = document.getElementById('settingsUID');
+  if(suid && userPhone){
+    suid.textContent = '📱 ' + userPhone;
+  }
+  launchApp();
+  pullData();
+}
+
+function changePin(){
+  if(confirm('Logout பண்ணவா? மீண்டும் OTP login தேவைப்படும்.')){
+    localStorage.removeItem('exp_phone');
+    localStorage.removeItem('exp_uid');
+    if(auth) auth.signOut().then(()=>location.reload()).catch(()=>location.reload());
+    else location.reload();
+  }
+}
+
+function signOut() {
+  if(confirm('Sign out பண்ணவா?')) {
+    localStorage.removeItem('exp_phone');
+    localStorage.removeItem('exp_uid');
+    if(auth) auth.signOut().then(()=>location.reload()).catch(()=>location.reload());
+    else location.reload();
+  }
+}
+
 function setSyncStatus(status){
   const dot=document.getElementById('syncDot');
   const lbl=document.getElementById('syncLabel');
   if(!dot)return;
-  if(status==='syncing'){dot.style.background='#f59e0b';lbl.textContent='Syncing...';}
-  else if(status==='synced'){dot.style.background='#16a34a';lbl.textContent='Synced';}
-  else{dot.style.background='#dc2626';lbl.textContent='Offline';}
+  if(status==='syncing'){dot.style.background='#f59e0b';if(lbl)lbl.textContent='Syncing...';}
+  else if(status==='synced'){dot.style.background='#16a34a';if(lbl)lbl.textContent='Synced';}
+  else{dot.style.background='#dc2626';if(lbl)lbl.textContent='Offline';}
 }
+
 function scheduleSync(){
-  if(!currentUser){return;}
+  if(!userPhone||!db)return;
   setSyncStatus('syncing');
   clearTimeout(syncTimeout);
-  syncTimeout=setTimeout(pushAllData, 1200);
+  syncTimeout=setTimeout(pushAllData,1200);
 }
+
 function pushAllData(){
-  if(!currentUser)return;
-  const uid=currentUser.uid;
-  // Don't store document binary data in Firebase (too large) — only metadata
+  if(!userPhone||!db)return;
   const docsMeta=documents.map(d=>({id:d.id,name:d.name,size:d.size,type:d.type,added:d.added}));
+  // profile pic is base64 large data — keep in localStorage only, not Firebase
+  const profileNoPic={name:profileData.name||'',pic:''};
   const payload={
     transactions,
     outstanding,
-    weekly: weeklyData,
-    prayer: prayerData,
-    profile: profileData,
+    weekly:weeklyData,
+    prayer:prayerData,
+    profile:profileNoPic,
+    banks:bankAccounts,
     docsMeta,
-    lastSync: Date.now()
+    lastSync:Date.now()
   };
-  db.ref('users/'+uid+'/data').set(payload)
+  db.ref('users/'+userPhone+'/data').set(payload)
     .then(()=>setSyncStatus('synced'))
     .catch(()=>setSyncStatus('offline'));
 }
-function pullData(uid){
+
+function pullData(){
+  if(!userPhone||!db){renderAll();loadProfile();return;}
   setSyncStatus('syncing');
-  db.ref('users/'+uid+'/data').once('value').then(snap=>{
+  db.ref('users/'+userPhone+'/data').once('value').then(snap=>{
     const d=snap.val();
     if(d){
       if(d.transactions)transactions=d.transactions;
       if(d.outstanding)outstanding=d.outstanding;
       if(d.weekly)weeklyData=d.weekly;
       if(d.prayer)prayerData=d.prayer;
-      if(d.profile)profileData=d.profile;
-      // Save to localStorage too (for offline)
+      if(d.profile){
+        // Keep existing profile pic from localStorage (not overwrite with empty)
+        const existingPic=profileData.pic||'';
+        profileData={...d.profile,pic:existingPic};
+        localStorage.setItem('exp_profile',JSON.stringify(profileData));
+      }
+      if(d.banks){bankAccounts=d.banks;localStorage.setItem('exp_banks',JSON.stringify(bankAccounts));}
       localStorage.setItem('exp_tx',JSON.stringify(transactions));
       localStorage.setItem('exp_out',JSON.stringify(outstanding));
-      saveTask();
-      savePrayer();
-      localStorage.setItem('exp_profile',JSON.stringify(profileData));
+      saveTask();savePrayer();
     }
     setSyncStatus('synced');
-    renderAll();
-    loadProfile();
-  }).catch(()=>setSyncStatus('offline'));
+    renderAll();loadProfile();
+  }).catch(()=>{setSyncStatus('offline');renderAll();loadProfile();});
 }
 
-// Auth state listener
-auth.onAuthStateChanged(user=>{
-  if(user){
-    currentUser=user;
-    document.getElementById('loginOverlay').style.display='none';
-    // Show splash then load
+function launchApp(){
+  const lastTab = sessionStorage.getItem('lastTab') || 'home';
+  const returning = sessionStorage.getItem('appReady') === '1';
+  if(returning){
+    // Back from PDF — skip splash, go directly to last tab
+    document.getElementById('splash').classList.add('hide');
+    document.getElementById('app').classList.add('ready');
+    const now=new Date();
+    document.getElementById('topDate').textContent=now.getDate()+' '+MONTHS[now.getMonth()]+' '+now.getFullYear();
+    document.getElementById('date').valueAsDate=new Date();
+    setType('income');
+    switchTab(lastTab);
+  } else {
+    // First open — show splash normally
+    sessionStorage.setItem('appReady','1');
     setTimeout(()=>{
       document.getElementById('splash').classList.add('hide');
       document.getElementById('app').classList.add('ready');
@@ -575,32 +1091,55 @@ auth.onAuthStateChanged(user=>{
       document.getElementById('topDate').textContent=now.getDate()+' '+MONTHS[now.getMonth()]+' '+now.getFullYear();
       document.getElementById('date').valueAsDate=new Date();
       setType('income');
-      pullData(user.uid);
-      setInterval(()=>{
-        const n=new Date();
-        document.getElementById('topDate').textContent=n.getDate()+' '+MONTHS[n.getMonth()]+' '+n.getFullYear();
-      },60000);
+      setInterval(()=>{const n=new Date();document.getElementById('topDate').textContent=n.getDate()+' '+MONTHS[n.getMonth()]+' '+n.getFullYear();},60000);
     },1800);
-  } else {
-    currentUser=null;
-    document.getElementById('loginOverlay').style.display='flex';
-    document.getElementById('app').classList.remove('ready');
   }
+}
+
+// AUTO START — OTP login flow
+window.addEventListener('DOMContentLoaded', function(){
+  initPinScreen();
+  // Init reCAPTCHA once after Firebase loads
+  setTimeout(() => initRecaptcha(), 1000);
 });
 
 // ============================================================
-// OVERRIDE save functions to also sync
+// SAVE FUNCTIONS
 // ============================================================
-const _origSave=function(){localStorage.setItem('exp_tx',JSON.stringify(transactions));};
-const _origSaveOut=function(){localStorage.setItem('exp_out',JSON.stringify(outstanding));};
-const _origSaveDocs=function(){localStorage.setItem('exp_docs',JSON.stringify(documents));};
-
-function save(){_origSave();scheduleSync();}
-function saveOut(){_origSaveOut();scheduleSync();}
-function saveDocs(){_origSaveDocs();scheduleSync();}
+function save(){localStorage.setItem('exp_tx',JSON.stringify(transactions));scheduleSync();syncToSheets();}
+function saveOut(){localStorage.setItem('exp_out',JSON.stringify(outstanding));scheduleSync();}
+function saveDocs(){localStorage.setItem('exp_docs',JSON.stringify(documents));scheduleSync();}
 function saveProfile(){localStorage.setItem('exp_profile',JSON.stringify(profileData));scheduleSync();}
-function saveTask(){saveTask();scheduleSync();}
-function savePrayer(){savePrayer();scheduleSync();}
+function saveTask(){localStorage.setItem('exp_weekly',JSON.stringify(weeklyData));scheduleSync();}
+function savePrayer(){localStorage.setItem('exp_prayer',JSON.stringify(prayerData));scheduleSync();}
+
+// ============================================================
+// GOOGLE SHEETS SYNC
+// ============================================================
+const SHEETS_URL = 'https://script.google.com/macros/s/AKfycbwd43_3-C_K52QiRtSo2c7N03zsigIvjfp4D1wF55H_atXfZlrwXPRpnKrPoh5d_VJflA/exec';
+
+let sheetsSyncTimeout = null;
+function syncToSheets(){
+  clearTimeout(sheetsSyncTimeout);
+  sheetsSyncTimeout = setTimeout(()=>{
+    if(!transactions.length) return;
+    const rows = transactions.map(t=>[
+      t.date, t.desc, t.category, t.type,
+      t.type==='income' ? t.amount : -t.amount
+    ]);
+    fetch(SHEETS_URL, {
+      method:'POST',
+      mode:'no-cors',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({type:'transactions', rows})
+    }).then(()=>{
+      showToast('☁️ Google Sheets-ல் sync ஆச்சு!');
+    }).catch(()=>{
+      // silent fail — localStorage still has data
+    });
+  }, 2000);
+}
+
 
 const ICONS={Salary:'💼',Business:'🏢',Investment:'📈',Food:'🍔',Transport:'🚌',Rent:'🏠',Medical:'💊',Education:'📚',Entertainment:'🎬',Shopping:'🛍️',Utilities:'💡',Other:'📌'};
 const INCOME_CATS=['Salary','Business','Investment','Other'];
@@ -645,24 +1184,16 @@ if(!bankAccounts.length){
   localStorage.setItem('exp_banks',JSON.stringify(bankAccounts));
 }
 
-// SPLASH
+// SPLASH handled by DOMContentLoaded above
 window.addEventListener('load',()=>{
-  setTimeout(()=>{
-    document.getElementById('splash').classList.add('hide');
-    document.getElementById('app').classList.add('ready');
-    const now=new Date();
-    document.getElementById('topDate').textContent=`${now.getDate()} ${MONTHS[now.getMonth()]} ${now.getFullYear()}`;
-    document.getElementById('date').valueAsDate=new Date();
-    setType('income');
-    loadProfile();
-    renderAll();
-    setInterval(()=>{const n=new Date();document.getElementById('topDate').textContent=n.getDate()+' '+MONTHS[n.getMonth()]+' '+n.getFullYear();renderAll();if(document.getElementById('page-stats').classList.contains('active'))renderAnalytics();},60000);
-  },2200);
+  // Additional setup if needed
 });
 
 // PROFILE
 function loadProfile(){
   document.getElementById('drawerNameInput').value=profileData.name||'My Name';
+  const uidEl=document.getElementById('drawerUID');
+  if(uidEl&&userPhone){const shortId=userPhone.startsWith('guest_')?'Offline Mode':('ID: ...'+userPhone.slice(-6));uidEl.textContent=shortId;}
   if(profileData.pic){
     document.getElementById('drawerAvatar').innerHTML='<img src="'+profileData.pic+'" style="width:100%;height:100%;object-fit:cover;border-radius:50%;"/>';
     const btn=document.getElementById('profileBtnTop');
@@ -698,6 +1229,7 @@ function closeProfile(){document.getElementById('profilePanel').classList.remove
 
 // TABS
 function switchTab(name){
+  sessionStorage.setItem('lastTab', name);
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
   document.getElementById('page-'+name).classList.add('active');
@@ -706,7 +1238,7 @@ function switchTab(name){
   // FAB only on home
   document.getElementById('fab').classList.toggle('show',name==='home');
   if(name==='stats')renderAnalytics();
-  if(name==='docs')renderDocs();
+  if(name==='docs')renderPdfBoxes();
   if(name==='bank')renderBank();
   if(name==='outstanding')renderOutstanding();
   if(name==='task')renderTaskPage();
@@ -747,7 +1279,7 @@ function deleteTransaction(id){
 }
 
 // RENDER
-function renderAll(){renderSummary();renderList();}
+function renderAll(){renderSummary();renderList();renderBank();renderOutstanding();renderTaskPage();renderPrayerPage();renderDocs();}
 function renderSummary(){
   const inc=transactions.filter(t=>t.type==='income').reduce((s,t)=>s+t.amount,0);
   const exp=transactions.filter(t=>t.type==='expense').reduce((s,t)=>s+t.amount,0);
@@ -767,6 +1299,7 @@ function renderList(){
       <div class="tx-ico ${t.type}">${ICONS[t.category]||'📌'}</div>
       <div class="tx-info"><div class="tx-desc">${t.desc}</div><div class="tx-meta">${t.category} · ${fmtDate(t.date)}</div></div>
       <div class="tx-right"><div class="tx-amt ${t.type}">${t.type==='income'?'+':'−'}${fmt(t.amount)}</div></div>
+      <button class="tx-edit" onclick="openEditTransaction(${t.id})">✏️</button>
       <button class="tx-del" onclick="deleteTransaction(${t.id})">✕</button>
     </div>`).join('');
 }
@@ -882,9 +1415,7 @@ function renderDatewiseHTML(){
 }
 
 // REPORT IMAGE
-function downloadReportImage(){
-  if(!transactions.length){showToast('⚠️ No data to export!');return;}
-  showToast('⏳ Generating HD image…');
+function buildReportCanvas(){
   const inc=transactions.filter(t=>t.type==='income').reduce((s,t)=>s+t.amount,0);
   const exp=transactions.filter(t=>t.type==='expense').reduce((s,t)=>s+t.amount,0);
   const bal=inc-exp;
@@ -920,19 +1451,56 @@ function downloadReportImage(){
   ctx.fillStyle='#2563eb';ctx.fillRect(0,H-34,W,34);
   ctx.fillStyle='rgba(255,255,255,0.8)';ctx.font='11px Arial';
   ctx.fillText('Created by ABDUL AJEEZ — Expense Tracker',pad,H-13);
-  try{
-    canvas.toBlob(blob=>{
-      const url=URL.createObjectURL(blob);
-      const a=document.createElement('a');a.href=url;a.download='expense-report-'+new Date().toISOString().split('T')[0]+'.png';
-      document.body.appendChild(a);a.click();
-      setTimeout(()=>{URL.revokeObjectURL(url);document.body.removeChild(a);},1200);
-      showToast('✅ HD Image downloaded!');
-    },'image/png');
-  }catch(e){
-    const url=canvas.toDataURL('image/png');
-    window.open(url,'_blank');
-    showToast('✅ Image opened — long press to save!');
-  }
+  return canvas;
+}
+function downloadReportImage(){
+  if(!transactions.length){showToast('⚠️ No data to export!');return;}
+  showToast('⏳ Image தயாராகுது…');
+  setTimeout(()=>{
+    const canvas=buildReportCanvas();
+    const dataUrl=canvas.toDataURL('image/png');
+    // APK WebView compatible — direct anchor download
+    try{
+      const a=document.createElement('a');
+      a.href=dataUrl;
+      a.download='expense-report-'+new Date().toISOString().split('T')[0]+'.png';
+      a.style.display='none';
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(()=>document.body.removeChild(a),500);
+      showToast('✅ Image download ஆகுது — Gallery-ல் பாருங்க!');
+    }catch(e){
+      // Fallback: show image in modal for long-press save
+      showImageModal(dataUrl);
+    }
+  },100);
+}
+function showImageModal(dataUrl){
+  const existing=document.getElementById('imgModal');
+  if(existing)existing.remove();
+  const modal=document.createElement('div');
+  modal.id='imgModal';
+  modal.style.cssText='position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,0.92);display:flex;flex-direction:column;align-items:center;overflow:auto;';
+  modal.innerHTML=`
+    <div style="background:#2563eb;color:#fff;padding:12px 16px;width:100%;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;">
+      <span style="font-size:13px;font-weight:700;">📊 Expense Report</span>
+      <button onclick="document.getElementById('imgModal').remove()" style="background:none;border:none;color:#fff;font-size:1.3rem;cursor:pointer;">✕</button>
+    </div>
+    <p style="color:rgba(255,255,255,0.8);font-size:12px;padding:10px;text-align:center;">Image-ஐ long press → Save / Share பண்ணுங்க</p>
+    <img src="${dataUrl}" style="max-width:100%;display:block;"/>
+  `;
+  document.body.appendChild(modal);
+}
+function downloadReportPDF(){
+  if(!transactions.length){showToast('⚠️ No data to export!');return;}
+  showToast('⏳ PDF தயாராகுது…');
+  setTimeout(()=>{
+    const canvas=buildReportCanvas();
+    const dataUrl=canvas.toDataURL('image/png');
+    // APK: show image with print hint
+    showImageModal(dataUrl);
+    showToast('📄 Image long press → Share → Print/Save as PDF');
+  },100);
 }
 function rrect(ctx,x,y,w,h,r){ctx.beginPath();ctx.moveTo(x+r,y);ctx.lineTo(x+w-r,y);ctx.quadraticCurveTo(x+w,y,x+w,y+r);ctx.lineTo(x+w,y+h-r);ctx.quadraticCurveTo(x+w,y+h,x+w-r,y+h);ctx.lineTo(x+r,y+h);ctx.quadraticCurveTo(x,y+h,x,y+h-r);ctx.lineTo(x,y+r);ctx.quadraticCurveTo(x,y,x+r,y);ctx.closePath();}
 
@@ -1051,7 +1619,10 @@ function renderBank(){
           <label>${f}</label>
           <input type="text" placeholder="Enter ${f}" value="${(b.data&&b.data[f])||''}" onchange="saveBankField(${bi},'${f}',this.value)"/>
         </div>`).join('')}
-      <button class="bank-share-btn" onclick="shareBank(${bi})">📤 Share ${b.name} Details</button>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.5rem;margin-top:0.3rem;">
+        <button class="bank-share-btn" onclick="shareBank(${bi})" style="margin-top:0;">📤 WhatsApp Text</button>
+        <button class="bank-share-btn" onclick="shareBankImage(${bi})" style="margin-top:0;background:#25d366;color:#fff;border-color:#25d366;">🖼️ Image Share</button>
+      </div>
     </div>`).join('');
 }
 function saveBankField(bi,field,val){
@@ -1070,16 +1641,69 @@ function shareBank(bi){
   showToast(`📤 Sharing ${b.name} details…`);
 }
 
+function shareBankImage(bi){
+  const b=bankAccounts[bi];
+  const SCALE=3,W=480,pad=22;
+  const lineH=28,headerH=56,footerH=32;
+  const rows=b.fields.length;
+  const H=headerH+rows*lineH+24+footerH;
+  const canvas=document.getElementById('reportCanvas');
+  canvas.width=W*SCALE;canvas.height=H*SCALE;
+  const ctx=canvas.getContext('2d');
+  ctx.scale(SCALE,SCALE);
+  // BG
+  ctx.fillStyle='#f5f6fa';ctx.fillRect(0,0,W,H);
+  // Header
+  ctx.fillStyle='#2563eb';ctx.fillRect(0,0,W,headerH);
+  ctx.fillStyle='#fff';ctx.font='bold 15px Arial';
+  ctx.fillText(b.icon+' '+b.name,pad,26);
+  ctx.font='10px Arial';ctx.fillStyle='rgba(255,255,255,0.8)';
+  ctx.fillText('Bank Account Details',pad,42);
+  // Fields
+  let y=headerH+10;
+  b.fields.forEach((f,fi)=>{
+    ctx.fillStyle=fi%2===0?'#fff':'#f0f4ff';
+    ctx.fillRect(pad,y,W-pad*2,lineH-2);
+    ctx.fillStyle='#6b7280';ctx.font='9px Arial';
+    ctx.textAlign='left';ctx.fillText(f,pad+8,y+10);
+    ctx.fillStyle='#111827';ctx.font='bold 11px Arial';
+    ctx.fillText((b.data&&b.data[f])||'—',pad+8,y+23);
+    y+=lineH;
+  });
+  // Footer
+  ctx.fillStyle='#2563eb';ctx.fillRect(0,H-footerH,W,footerH);
+  ctx.fillStyle='rgba(255,255,255,0.8)';ctx.font='9px Arial';
+  ctx.textAlign='left';
+  ctx.fillText('ABDUL AJEEZ — Expense Tracker',pad,H-footerH+19);
+  // Save & share
+  const dataUrl=canvas.toDataURL('image/png');
+  // APK WebView compatible
+  try{
+    const a=document.createElement('a');
+    a.href=dataUrl;
+    a.download=b.name.replace(/\s+/g,'-').toLowerCase()+'-details.png';
+    a.style.display='none';
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(()=>document.body.removeChild(a),500);
+    showToast('✅ Image download ஆகுது!');
+  }catch(e){
+    showImageModal(dataUrl);
+    showToast('✅ Long press image → Save/Share பண்ணுங்க!');
+  }
+}
+
 // OUTSTANDING
 function addOutstanding(mode){
+  const name=document.getElementById('outName').value.trim();
   const desc=document.getElementById('outDesc').value.trim();
   const amt=parseFloat(document.getElementById('outAmt').value);
   if(!desc){showToast('⚠️ Enter description!');return;}
   if(!amt||amt<=0){showToast('⚠️ Enter valid amount!');return;}
   const finalAmt=mode==='deduct'?-amt:amt;
-  outstanding.push({id:Date.now(),desc,amt:finalAmt,mode:mode||'add'});
+  outstanding.push({id:Date.now(),name:name||'',desc,amt:finalAmt,mode:mode||'add'});
   saveOut();renderOutstanding();
-  document.getElementById('outDesc').value='';document.getElementById('outAmt').value='';
+  document.getElementById('outName').value='';document.getElementById('outDesc').value='';document.getElementById('outAmt').value='';
   showToast(mode==='deduct'?'✅ Deducted!':'✅ Added!');
 }
 function deleteOut(id){
@@ -1095,14 +1719,18 @@ function renderOutstanding(){
   const deducted=outstanding.filter(o=>o.amt<0).reduce((s,o)=>s+Math.abs(o.amt),0);
   if(!outstanding.length){list.innerHTML=`<div class="empty-state"><div class="eicon">📋</div><p>No outstanding amounts.<br>Add or deduct above.</p></div>`;document.getElementById('outTotalBlock').style.display='none';return;}
   list.innerHTML=outstanding.map(o=>`
-    <div class="out-item">
-      <div class="out-item-desc">${o.mode==='deduct'?'➖':'➕'} ${o.desc}</div>
-      <div class="out-item-amt" style="color:${o.amt<0?'#16a34a':'#dc2626'}">${o.amt<0?'−':'+'}${fmt(Math.abs(o.amt))}</div>
-      <button class="out-del" onclick="deleteOut(${o.id})">✕</button>
+    <div class="out-item" style="flex-wrap:wrap;gap:0.3rem;">
+      <div style="flex:1;min-width:0;">
+        ${o.name?`<div style="font-size:0.72rem;font-weight:700;color:#2563eb;margin-bottom:2px;">👤 ${o.name}</div>`:''}
+        <div class="out-item-desc" style="font-size:0.83rem;">${o.mode==='deduct'?'➖':'➕'} ${o.desc}</div>
+      </div>
+      <div style="display:flex;align-items:center;gap:4px;flex-shrink:0;">
+        <div class="out-item-amt" style="color:${o.amt<0?'#16a34a':'#dc2626'}">${o.amt<0?'−':'+'}${fmt(Math.abs(o.amt))}</div>
+        <button class="out-edit" onclick="openEditOutstanding('${o.id}')">✏️</button>
+        <button class="out-del" onclick="deleteOut(${o.id})">✕</button>
+      </div>
     </div>`).join('');
   document.getElementById('outTotalBlock').style.display='block';
-  const tb=document.getElementById('outTotalBlock');
-  tb.querySelector('.out-total-val')||null;
   document.getElementById('outTotalVal').textContent=(total<0?'−':'')+fmt(Math.abs(total));
 }
 function shareOutstanding(){
@@ -1115,7 +1743,8 @@ function shareOutstanding(){
   outstanding.forEach((o,i)=>{
     const sign=o.amt>=0?'➕':'➖';
     const amtStr=(o.amt<0?'−':'+')+fmt(Math.abs(o.amt));
-    txt+=(i+1)+'. '+sign+' '+o.desc+' — '+amtStr+'\n';
+    const nameStr=o.name?` (${o.name})`:'';
+    txt+=(i+1)+'. '+sign+' '+o.desc+nameStr+' — '+amtStr+'\n';
   });
   txt+='\n━━━━━━━━━━━━━━━\n';
   txt+='➕ Total Added    : +'+fmt(added)+'\n';
@@ -1126,6 +1755,109 @@ function shareOutstanding(){
   try{navigator.clipboard.writeText(txt);}catch(e){}
   window.open('https://wa.me/?text='+encodeURIComponent(txt),'_blank');
   showToast('📤 Sharing outstanding list…');
+}
+
+function shareOutstandingImage(){
+  if(!outstanding.length){showToast('⚠️ No outstanding items!');return;}
+  const total=outstanding.reduce((s,o)=>s+o.amt,0);
+  const added=outstanding.filter(o=>o.amt>0).reduce((s,o)=>s+o.amt,0);
+  const deducted=outstanding.filter(o=>o.amt<0).reduce((s,o)=>s+Math.abs(o.amt),0);
+  const SCALE=3,W=480,pad=22;
+  const lineH=38,headerH=60,summaryH=80,footerH=32;
+  const H=headerH+outstanding.length*lineH+16+summaryH+footerH;
+  const canvas=document.getElementById('reportCanvas');
+  canvas.width=W*SCALE;canvas.height=H*SCALE;
+  const ctx=canvas.getContext('2d');
+  ctx.scale(SCALE,SCALE);
+  // BG
+  ctx.fillStyle='#f5f6fa';ctx.fillRect(0,0,W,H);
+  // Header
+  ctx.fillStyle='#dc2626';ctx.fillRect(0,0,W,headerH);
+  ctx.fillStyle='#fff';ctx.font='bold 15px Arial';
+  ctx.fillText('Outstanding Summary',pad,28);
+  ctx.font='10px Arial';ctx.fillStyle='rgba(255,255,255,0.85)';
+  ctx.fillText('Date: '+new Date().toLocaleDateString('en-IN'),pad,46);
+  // Items
+  let y=headerH+10;
+  outstanding.forEach((o,i)=>{
+    ctx.fillStyle=i%2===0?'#fff':'#fef2f2';
+    ctx.fillRect(pad,y,W-pad*2,lineH-2);
+    const sign=o.amt>=0?'+':'-';
+    // Name line
+    if(o.name){
+      ctx.fillStyle='#2563eb';ctx.font='bold 9px Arial';
+      ctx.textAlign='left';
+      ctx.fillText('👤 '+o.name,pad+6,y+13);
+    }
+    ctx.fillStyle='#374151';ctx.font='10px Arial';
+    ctx.textAlign='left';
+    const desc=o.desc.length>28?o.desc.substring(0,27)+'…':o.desc;
+    ctx.fillText((i+1)+'. '+(o.mode==='deduct'?'- ':' + ')+desc,pad+6,y+(o.name?27:19));
+    ctx.fillStyle=o.amt>=0?'#dc2626':'#16a34a';
+    ctx.font='bold 11px Arial';
+    ctx.textAlign='right';
+    ctx.fillText((o.amt<0?'−':'+')+fmt(Math.abs(o.amt)),W-pad-4,y+(o.name?27:19));
+    ctx.textAlign='left';
+    y+=lineH;
+  });
+  y+=8;
+  // Summary box
+  ctx.fillStyle='#1f2937';ctx.beginPath();ctx.roundRect(pad,y,W-pad*2,summaryH,8);ctx.fill();
+  ctx.fillStyle='#9ca3af';ctx.font='9px Arial';
+  ctx.fillText('Total Added',pad+10,y+18);
+  ctx.fillStyle='#86efac';ctx.font='bold 12px Arial';
+  ctx.textAlign='right';ctx.fillText('+'+fmt(added),W-pad-8,y+18);
+  ctx.textAlign='left';
+  ctx.fillStyle='#9ca3af';ctx.font='9px Arial';
+  ctx.fillText('Total Deducted',pad+10,y+38);
+  ctx.fillStyle='#fca5a5';ctx.font='bold 12px Arial';
+  ctx.textAlign='right';ctx.fillText('−'+fmt(deducted),W-pad-8,y+38);
+  ctx.textAlign='left';
+  ctx.fillStyle=total>=0?'#fbbf24':'#86efac';ctx.font='9px Arial';
+  ctx.fillText('Net Balance',pad+10,y+62);
+  ctx.fillStyle=total>=0?'#fbbf24':'#86efac';ctx.font='bold 15px Arial';
+  ctx.textAlign='right';
+  ctx.fillText((total<0?'−':'+')+fmt(Math.abs(total)),W-pad-8,y+62);
+  ctx.textAlign='left';
+  // Footer
+  const fY=H-footerH;
+  ctx.fillStyle='#dc2626';ctx.fillRect(0,fY,W,footerH);
+  ctx.fillStyle='rgba(255,255,255,0.8)';ctx.font='9px Arial';
+  ctx.fillText('ABDUL AJEEZ — Expense Tracker',pad,fY+19);
+  // Share image directly via Web Share API
+  showToast('⏳ Image தயாராகுது…');
+  canvas.toBlob(async function(blob){
+    const fname='outstanding-'+new Date().toISOString().split('T')[0]+'.png';
+    // Try Web Share API (direct image to WhatsApp)
+    if(navigator.share && navigator.canShare){
+      const file=new File([blob],fname,{type:'image/png'});
+      if(navigator.canShare({files:[file]})){
+        try{
+          await navigator.share({files:[file],title:'Outstanding Summary',text:'Outstanding Report - Expense Tracker by ABDUL AJEEZ'});
+          showToast('✅ Image shared!');
+          return;
+        }catch(shareErr){
+          if(shareErr.name!=='AbortError'){/* fall through */}
+          else{return;}
+        }
+      }
+    }
+    // Fallback: APK WebView compatible
+    const dataUrl=canvas.toDataURL('image/png');
+    try{
+      const a=document.createElement('a');
+      a.href=dataUrl;
+      a.download='outstanding-report-'+new Date().toISOString().split('T')[0]+'.png';
+      a.style.display='none';
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(()=>document.body.removeChild(a),500);
+      showToast('✅ Image download ஆகுது!');
+    }catch(e){
+      showImageModal(dataUrl);
+      showToast('✅ Long press image → Save/Share பண்ணுங்க!');
+    }
+  },'image/png');
 }
 
 // TASK - WEEKLY BALANCE TRACKER
@@ -1261,15 +1993,21 @@ function saveWeeklyReport(type){
     ctx.fillStyle='#2563eb';ctx.fillRect(0,h-30,w,30);
     ctx.fillStyle='rgba(255,255,255,0.75)';ctx.font='9px Arial';
     ctx.fillText('ABDUL AJEEZ - Expense Tracker',pad,h-10);
+    var dataUrl=canvas.toDataURL('image/png');
+    // APK WebView compatible
     try{
-      canvas.toBlob(function(blob){
-        var url=URL.createObjectURL(blob);
-        var a=document.createElement('a');a.href=url;a.download='weekly-report-'+wk+'.png';
-        document.body.appendChild(a);a.click();
-        setTimeout(function(){URL.revokeObjectURL(url);document.body.removeChild(a);},1200);
-        showToast('Weekly report image saved!');
-      },'image/png');
-    }catch(e){window.open(canvas.toDataURL('image/png'),'_blank');showToast('Long press image to save!');}
+      var a=document.createElement('a');
+      a.href=dataUrl;
+      a.download='weekly-report-'+new Date().toISOString().split('T')[0]+'.png';
+      a.style.display='none';
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(function(){document.body.removeChild(a);},500);
+      showToast('✅ Image download ஆகுது!');
+    }catch(e){
+      showImageModal(dataUrl);
+      showToast('✅ Image long press → Save/Share பண்ணுங்க!');
+    }
   } else if(type==='pdf'){
     var html='<!DOCTYPE html><html><head><meta charset="UTF-8"/><title>Weekly Report</title>';
     html+='<style>body{font-family:Arial,sans-serif;font-size:11px;margin:20px;}h2{color:#2563eb;margin:0 0 2px;}';
@@ -1293,9 +2031,20 @@ function saveWeeklyReport(type){
     }
     html+='<p style="margin-top:16px;font-size:9px;color:#999;">Via Expense Tracker by ABDUL AJEEZ</p>';
     html+='</body></html>';
-    var w2=window.open('','_blank');
-    if(w2){w2.document.write(html);w2.document.close();setTimeout(function(){w2.print();},500);}
-    showToast('PDF print dialog opened!');
+    // APK WebView compatible PDF
+    try{
+      var blob=new Blob([html],{type:'text/html'});
+      var url=URL.createObjectURL(blob);
+      var a=document.createElement('a');
+      a.href=url;
+      a.download='weekly-report-'+new Date().toISOString().split('T')[0]+'.html';
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(function(){URL.revokeObjectURL(url);document.body.removeChild(a);},1000);
+      showToast('✅ HTML file download ஆகுது — browser-ல் open → Print/Share!');
+    }catch(e){
+      showToast('⚠️ WhatsApp Share try பண்ணுங்க!');
+    }
   }
 }
 
@@ -1448,15 +2197,21 @@ function savePrayerReport(type){
     ctx.fillStyle='#059669';ctx.fillRect(0,H-32,W,32);
     ctx.fillStyle='rgba(255,255,255,0.8)';ctx.font='10px Arial';
     ctx.fillText('ABDUL AJEEZ — Expense Tracker | Total: '+totalDone+'/'+totalP,pad/SCALE,H-11);
+    var dataUrl2=canvas.toDataURL('image/png');
+    // APK WebView compatible
     try{
-      canvas.toBlob(function(blob){
-        var url=URL.createObjectURL(blob);
-        var a=document.createElement('a');a.href=url;a.download='prayer-report-'+wk+'.png';
-        document.body.appendChild(a);a.click();
-        setTimeout(function(){URL.revokeObjectURL(url);document.body.removeChild(a);},1200);
-        showToast('Prayer report image saved!');
-      },'image/png');
-    }catch(e){window.open(canvas.toDataURL('image/png'),'_blank');showToast('Long press to save!');}
+      var a2=document.createElement('a');
+      a2.href=dataUrl2;
+      a2.download='prayer-report-'+new Date().toISOString().split('T')[0]+'.png';
+      a2.style.display='none';
+      document.body.appendChild(a2);
+      a2.click();
+      setTimeout(function(){document.body.removeChild(a2);},500);
+      showToast('✅ Image download ஆகுது!');
+    }catch(e){
+      showImageModal(dataUrl2);
+      showToast('✅ Long press image → Save/Share பண்ணுங்க!');
+    }
   } else if(type==='pdf'){
     var html2='<!DOCTYPE html><html><head><meta charset="UTF-8"/><title>Prayer Report</title>';
     html2+='<style>body{font-family:Arial,sans-serif;font-size:11px;margin:18px;}h2{color:#059669;margin:0 0 2px;}';
@@ -1480,10 +2235,336 @@ function savePrayerReport(type){
     }
     html2+='<p style="margin-top:14px;font-weight:700;color:#059669;">Total: '+td2+'/'+tp2+' prayers</p>';
     html2+='<p style="font-size:9px;color:#999;">Via Expense Tracker by ABDUL AJEEZ</p></body></html>';
-    var w3=window.open('','_blank');
-    if(w3){w3.document.write(html2);w3.document.close();setTimeout(function(){w3.print();},500);}
-    showToast('Prayer PDF print dialog opened!');
+    // APK WebView compatible
+    try{
+      var blob3=new Blob([html2],{type:'text/html'});
+      var url3=URL.createObjectURL(blob3);
+      var a3=document.createElement('a');
+      a3.href=url3;
+      a3.download='prayer-report-'+new Date().toISOString().split('T')[0]+'.html';
+      document.body.appendChild(a3);
+      a3.click();
+      setTimeout(function(){URL.revokeObjectURL(url3);document.body.removeChild(a3);},1000);
+      showToast('✅ Prayer report download ஆகுது!');
+    }catch(e){
+      showToast('⚠️ WhatsApp Share try பண்ணுங்க!');
+    }
   }
+}
+
+// PDF LINK BOXES — Edit the URL in each box below to your Google Drive PDF link
+const PDF_DOCS = [
+  { name: 'Aadhar Card',        icon: '🪪', color: '#2563eb', url: '' },
+  { name: 'PAN Card',           icon: '💳', color: '#7c3aed', url: '' },
+  { name: 'Driving Licence',    icon: '🚗', color: '#059669', url: 'https://drive.google.com/file/d/1--qXacOfODD850fo19MX8M4t29XgsiHL/view?usp=drivesdk' },
+  { name: 'Passport',           icon: '📘', color: '#dc2626', url: '' },
+  { name: 'Bank Passbook',      icon: '🏦', color: '#d97706', url: '' },
+  { name: 'Insurance Policy',   icon: '🛡️', color: '#0891b2', url: '' },
+  { name: 'Property Document',  icon: '🏠', color: '#be185d', url: '' },
+  { name: 'Salary Slip',        icon: '💰', color: '#1d4ed8', url: '' },
+  { name: 'RC Book',            icon: '📋', color: '#9333ea', url: '' },
+  { name: 'Other Document',     icon: '📄', color: '#374151', url: '' },
+];
+
+function renderPdfBoxes(){
+  const grid=document.getElementById('pdfBoxGrid');
+  if(!grid)return;
+  grid.innerHTML=PDF_DOCS.map((doc,i)=>`
+    <div class="pdf-box" onclick="openPdfDoc(${i})" style="border-left:4px solid ${doc.color};">
+      <div class="pdf-box-icon" style="background:${doc.color}18;">${doc.icon}</div>
+      <div class="pdf-box-body">
+        <div class="pdf-box-name">${doc.name}</div>
+        <div class="pdf-box-sub" style="color:${doc.color};">${doc.url ? '📎 Tap to open PDF' : '🔗 Link not set'}</div>
+      </div>
+      <div class="pdf-box-arrow" style="color:${doc.color};">›</div>
+    </div>`).join('');
+}
+
+function openPdfDoc(i){
+  const doc=PDF_DOCS[i];
+  if(!doc.url){showToast('⚠️ '+doc.name+' link not set');return;}
+  window.open(doc.url,'_blank');
+}
+
+// ============================================================
+// EXPORT / IMPORT
+// ============================================================
+function getBackupData(){
+  return JSON.stringify({
+    version:2,
+    exportDate:new Date().toISOString(),
+    transactions,
+    outstanding,
+    weekly:weeklyData,
+    prayer:prayerData,
+    profile:profileData,
+    banks:bankAccounts,
+    documents:documents
+  });
+}
+
+// Method 1: Download file
+function exportDownload(){
+  try{
+    const json=getBackupData();
+    const fname='expense-backup-'+new Date().toISOString().split('T')[0]+'.json';
+
+    // Method 1: Direct anchor click (works in most WebViews & browsers)
+    try{
+      const dataUri='data:application/json;charset=utf-8,'+encodeURIComponent(json);
+      const a=document.createElement('a');
+      a.href=dataUri;
+      a.download=fname;
+      a.style.display='none';
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(()=>document.body.removeChild(a),500);
+      showToast('✅ JSON Download ஆகுது!');
+      return;
+    }catch(e1){}
+
+    // Method 2: Blob (browser fallback)
+    try{
+      const blob=new Blob([json],{type:'application/json'});
+      const url=URL.createObjectURL(blob);
+      const a=document.createElement('a');
+      a.href=url;
+      a.download=fname;
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(()=>{URL.revokeObjectURL(url);document.body.removeChild(a);},1000);
+      showToast('✅ JSON Download ஆகுது!');
+      return;
+    }catch(e2){}
+
+    // Method 3: WebView fallback — show data in textarea to copy
+    showExportTextModal(json);
+  }catch(e){
+    showToast('⚠️ Export error — WhatsApp try பண்ணுங்க!');
+  }
+}
+
+// WebView-ல் download work ஆகாம போனா — text copy modal காட்டுவோம்
+function showExportTextModal(json){
+  // Remove existing modal if any
+  const existing=document.getElementById('exportTextModal');
+  if(existing)existing.remove();
+
+  const modal=document.createElement('div');
+  modal.id='exportTextModal';
+  modal.style.cssText='position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,0.6);display:flex;align-items:flex-end;justify-content:center;';
+  modal.innerHTML=`
+    <div style="background:#fff;border-radius:20px 20px 0 0;padding:1.2rem 1rem 2rem;width:100%;max-width:480px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.8rem;">
+        <span style="font-size:0.95rem;font-weight:700;">💾 Backup Data Copy பண்ணுங்க</span>
+        <button onclick="document.getElementById('exportTextModal').remove()" style="background:none;border:none;font-size:1.3rem;cursor:pointer;">✕</button>
+      </div>
+      <p style="font-size:0.72rem;color:#6b7280;margin-bottom:0.7rem;">இந்த text-ஐ copy பண்ணி WhatsApp Saved Messages-ல் அனுப்புங்க</p>
+      <textarea id="exportTextArea" style="width:100%;height:120px;border:1.5px solid #e2e5ed;border-radius:10px;padding:0.6rem;font-size:0.72rem;font-family:monospace;resize:none;" readonly>${json}</textarea>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.5rem;margin-top:0.8rem;">
+        <button onclick="
+          const ta=document.getElementById('exportTextArea');
+          ta.select();ta.setSelectionRange(0,99999);
+          try{navigator.clipboard.writeText(ta.value).then(()=>showToast('✅ Copy ஆச்சு!')).catch(()=>{document.execCommand('copy');showToast('✅ Copy ஆச்சு!');});}
+          catch(e){document.execCommand('copy');showToast('✅ Copy ஆச்சு!');}
+        " style="padding:0.75rem;background:#2563eb;color:#fff;border:none;border-radius:10px;font-size:0.82rem;font-weight:600;cursor:pointer;">📋 Copy</button>
+        <button onclick="
+          const json2=document.getElementById('exportTextArea').value;
+          const msg='🔒 Expense Backup
+'+json2;
+          window.open('https://wa.me/?text='+encodeURIComponent(msg),'_blank');
+        " style="padding:0.75rem;background:#25d366;color:#fff;border:none;border-radius:10px;font-size:0.82rem;font-weight:600;cursor:pointer;">📤 WhatsApp</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(modal);
+}
+
+// Method 2: Google Drive (copy text → user pastes in Drive doc)
+function exportToDrive(){
+  const json=getBackupData();
+  try{
+    navigator.clipboard.writeText(json).then(()=>{
+      showToast('✅ Copy ஆச்சு! Drive-ல் New Doc → Paste பண்ணுங்க');
+      setTimeout(()=>{
+        window.open('https://docs.new','_blank');
+      },1500);
+    }).catch(()=>fallbackCopy(json,'Drive'));
+  }catch(e){fallbackCopy(json,'Drive');}
+}
+
+// Method 3: WhatsApp share
+function exportWhatsApp(){
+  const json=getBackupData();
+  try{
+    navigator.clipboard.writeText(json).then(()=>{
+      const msg='🔒 Expense Tracker Backup\n📅 '+new Date().toLocaleDateString('en-IN')+'\n\n'+json;
+      window.open('https://wa.me/?text='+encodeURIComponent(msg),'_blank');
+      showToast('✅ WhatsApp open ஆகுது — Saved Messages-ல் send பண்ணுங்க!');
+    }).catch(()=>{
+      const msg='🔒 Expense Tracker Backup\n📅 '+new Date().toLocaleDateString('en-IN')+'\n\n'+json;
+      window.open('https://wa.me/?text='+encodeURIComponent(msg),'_blank');
+    });
+  }catch(e){
+    window.open('https://wa.me/?text='+encodeURIComponent(json),'_blank');
+  }
+}
+
+function fallbackCopy(text,dest){
+  const ta=document.createElement('textarea');
+  ta.value=text;ta.style.position='fixed';ta.style.opacity='0';
+  document.body.appendChild(ta);ta.focus();ta.select();
+  try{document.execCommand('copy');showToast('✅ Copy ஆச்சு! '+dest+'-ல் Paste பண்ணுங்க');}
+  catch(e){showToast('⚠️ Manual copy பண்ணுங்க');}
+  document.body.removeChild(ta);
+}
+
+// Import from file
+function importData(e){
+  const file=e.target.files[0];
+  if(!file)return;
+  const reader=new FileReader();
+  reader.onload=ev=>{
+    try{
+      let text=ev.target.result.trim();
+      // Remove BOM if present
+      if(text.charCodeAt(0)===0xFEFF)text=text.slice(1);
+      // Try to find JSON object start (handle prefixed text)
+      const startIdx=text.indexOf('{');
+      if(startIdx>0)text=text.substring(startIdx);
+      const data=JSON.parse(text);
+      applyImport(data);
+    }catch(err){
+      showToast('⚠️ File படிக்க முடியல! சரியான backup JSON file select பண்ணுங்க.');
+    }
+  };
+  reader.readAsText(file,'UTF-8');
+  e.target.value='';
+}
+
+// Import from pasted text (WhatsApp method)
+function importFromText(){
+  const text=prompt('WhatsApp-லிருந்து copy பண்ண backup text-ஐ இங்க paste பண்ணுங்க:');
+  if(!text)return;
+  try{
+    let t=text.trim();
+    if(t.charCodeAt(0)===0xFEFF)t=t.slice(1);
+    const startIdx=t.indexOf('{');
+    if(startIdx>=0)t=t.substring(startIdx);
+    const data=JSON.parse(t);
+    applyImport(data);
+  }catch(e){showToast('⚠️ சரியான backup text இல்ல — மறுபடியும் try பண்ணுங்க!');}
+}
+
+function applyImport(data){
+  // Accept any object that has at least one known data field (version check removed — too strict)
+  const hasData=data.transactions||data.outstanding||data.weekly||data.prayer||data.profile||data.banks;
+  if(!hasData){showToast('⚠️ Backup data இல்ல — சரியான file போடுங்க!');return;}
+  if(data.transactions){transactions=data.transactions;localStorage.setItem('exp_tx',JSON.stringify(transactions));}
+  if(data.outstanding){outstanding=data.outstanding;localStorage.setItem('exp_out',JSON.stringify(outstanding));}
+  if(data.weekly){weeklyData=data.weekly;localStorage.setItem('exp_weekly',JSON.stringify(weeklyData));}
+  if(data.prayer){prayerData=data.prayer;localStorage.setItem('exp_prayer',JSON.stringify(prayerData));}
+  if(data.profile){
+    // Preserve existing profile pic if backup has none
+    const existingPic=profileData.pic||'';
+    profileData={...data.profile};
+    if(!profileData.pic&&existingPic)profileData.pic=existingPic;
+    localStorage.setItem('exp_profile',JSON.stringify(profileData));
+  }
+  if(data.banks){bankAccounts=data.banks;localStorage.setItem('exp_banks',JSON.stringify(bankAccounts));}
+  if(data.documents){documents=data.documents;localStorage.setItem('exp_docs',JSON.stringify(documents));}
+  renderAll();loadProfile();
+  const count=data.transactions?data.transactions.length:0;
+  showToast('✅ Restore ஆச்சு! '+count+' transactions வந்துச்சு.');
+}
+
+// ============================================================
+// EDIT TRANSACTION
+// ============================================================
+let editingTxId = null;
+let editingTxType = 'income';
+
+function openEditTransaction(id){
+  const t=transactions.find(tx=>Number(tx.id)===Number(id));
+  if(!t)return;
+  editingTxId=Number(id);
+  editingTxType=t.type;
+  document.getElementById('editDesc').value=t.desc;
+  document.getElementById('editAmount').value=t.amount;
+  document.getElementById('editDate').value=t.date;
+  setEditType(t.type);
+  const cats=t.type==='income'?INCOME_CATS:EXPENSE_CATS;
+  document.getElementById('editCategory').innerHTML=cats.map(c=>`<option value="${c}"${c===t.category?' selected':''}>${ICONS[c]} ${c}</option>`).join('');
+  document.getElementById('editModal').classList.add('show');
+}
+function closeEditModal(){document.getElementById('editModal').classList.remove('show');editingTxId=null;}
+function setEditType(type){
+  editingTxType=type;
+  document.getElementById('editBtnIncome').className='edit-type-btn'+(type==='income'?' active-income':'');
+  document.getElementById('editBtnExpense').className='edit-type-btn'+(type==='expense'?' active-expense':'');
+  const cats=type==='income'?INCOME_CATS:EXPENSE_CATS;
+  const prev=document.getElementById('editCategory').value;
+  document.getElementById('editCategory').innerHTML=cats.map(c=>`<option value="${c}"${c===prev?' selected':''}>${ICONS[c]} ${c}</option>`).join('');
+}
+function saveEditTransaction(){
+  if(!editingTxId)return;
+  const desc=document.getElementById('editDesc').value.trim();
+  const amount=parseFloat(document.getElementById('editAmount').value);
+  const category=document.getElementById('editCategory').value;
+  const date=document.getElementById('editDate').value;
+  if(!desc){showToast('⚠️ Enter description!');return;}
+  if(!amount||amount<=0){showToast('⚠️ Enter valid amount!');return;}
+  if(!date){showToast('⚠️ Select date!');return;}
+  const idx=transactions.findIndex(tx=>Number(tx.id)===editingTxId);
+  if(idx<0)return;
+  transactions[idx]={...transactions[idx],type:editingTxType,desc,amount,category,date};
+  save();renderSummary();renderList();
+  closeEditModal();showToast('✅ Transaction updated!');
+}
+
+// ============================================================
+// EDIT OUTSTANDING
+// ============================================================
+let editingOutId = null;
+let editingOutMode = 'add';
+
+function openEditOutstanding(id){
+  const o=outstanding.find(x=>String(x.id)===String(id));
+  if(!o){showToast('⚠️ Item not found!');return;}
+  editingOutId=o.id;
+  editingOutMode=o.mode||'add';
+  document.getElementById('editOutName').value=o.name||'';
+  document.getElementById('editOutDesc').value=o.desc||'';
+  document.getElementById('editOutAmt').value=Math.abs(o.amt);
+  setEditOutMode(o.mode||'add');
+  const modal=document.getElementById('editOutModal');
+  modal.style.display='flex';
+  modal.classList.add('show');
+}
+function closeEditOutModal(){
+  const modal=document.getElementById('editOutModal');
+  modal.classList.remove('show');
+  modal.style.display='none';
+  editingOutId=null;
+}
+function setEditOutMode(mode){
+  editingOutMode=mode;
+  document.getElementById('editOutBtnAdd').className='edit-type-btn'+(mode==='add'?' active-income':'');
+  document.getElementById('editOutBtnDeduct').className='edit-type-btn'+(mode==='deduct'?' active-expense':'');
+}
+function saveEditOutstanding(){
+  if(!editingOutId)return;
+  const name=document.getElementById('editOutName').value.trim();
+  const desc=document.getElementById('editOutDesc').value.trim();
+  const amt=parseFloat(document.getElementById('editOutAmt').value);
+  if(!desc){showToast('⚠️ Enter description!');return;}
+  if(!amt||amt<=0){showToast('⚠️ Enter valid amount!');return;}
+  const idx=outstanding.findIndex(x=>String(x.id)===String(editingOutId));
+  if(idx<0){showToast('⚠️ Item not found!');return;}
+  const finalAmt=editingOutMode==='deduct'?-amt:amt;
+  outstanding[idx]={...outstanding[idx],name,desc,amt:finalAmt,mode:editingOutMode};
+  saveOut();renderOutstanding();
+  closeEditOutModal();showToast('✅ Outstanding updated!');
 }
 
 // CONFIRM DIALOG
