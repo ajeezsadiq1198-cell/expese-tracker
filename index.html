@@ -293,7 +293,7 @@ html,body{width:100%;overflow-x:hidden;background:var(--bg);color:var(--text);fo
 #reportCanvas{display:none;}
 
 /* LOGIN SCREEN */
-#pinScreen{position:fixed;inset:0;background:linear-gradient(160deg,#1e40af 0%,#2563eb 60%,#3b82f6 100%);z-index:10000;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:1.5rem;}
+#pinScreen{position:fixed;inset:0;background:linear-gradient(160deg,#1e40af 0%,#2563eb 60%,#3b82f6 100%);z-index:10000;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:1.5rem;transition:opacity 0.15s;}
 #pinScreen.hide{display:none;}
 .pin-logo{width:76px;height:76px;background:#fff;border-radius:22px;display:flex;align-items:center;justify-content:center;font-size:2.2rem;box-shadow:0 8px 32px rgba(0,0,0,0.18);margin-bottom:1rem;}
 .pin-title{font-size:1.4rem;font-weight:700;color:#fff;margin-bottom:4px;}
@@ -947,28 +947,33 @@ function resendOTP(){
 // INIT PIN SCREEN — Check if already logged in
 // ============================================================
 function initPinScreen(){
-  // Check if already signed in via Firebase
-  if(auth){
-    const cachedPhone = localStorage.getItem('exp_phone');
-    // Use onAuthStateChanged to check existing session
-    auth.onAuthStateChanged(user => {
-      if(user && user.phoneNumber){
-        // Already logged in — skip OTP
-        userPhone = user.phoneNumber;
-        localStorage.setItem('exp_uid', userPhone);
-        localStorage.setItem('exp_phone', userPhone);
-        showLoadingState('✅ Welcome back! உள்ளே போகிறோம்...');
-        setTimeout(() => enterApp(), 800);
-      } else if(cachedPhone && cachedPhone.startsWith('+91')){
-        // Cached phone but session expired — show phone screen with prefilled
+  if(!auth) return;
+
+  // Check cached session FIRST — instant hide if token exists in localStorage
+  const cachedPhone = localStorage.getItem('exp_phone');
+
+  // Listen to auth state
+  auth.onAuthStateChanged(user => {
+    if(user && user.phoneNumber){
+      // Already logged in — instantly hide login page, no delay
+      userPhone = user.phoneNumber;
+      localStorage.setItem('exp_uid', userPhone);
+      localStorage.setItem('exp_phone', userPhone);
+      document.getElementById('pinScreen').classList.add('hide');
+      const suid = document.getElementById('settingsUID');
+      if(suid) suid.textContent = '📱 ' + userPhone;
+      launchApp();
+      pullData();
+    } else {
+      // Not logged in — show phone entry
+      if(cachedPhone && cachedPhone.startsWith('+91')){
         const digits = cachedPhone.replace('+91','');
         document.getElementById('phoneInput').value = digits;
         document.getElementById('pinStatus').style.color = 'rgba(255,255,255,0.7)';
         document.getElementById('pinStatus').textContent = '🔒 Session expire ஆச்சு — மீண்டும் login பண்ணுங்க';
       }
-      // else: show phone entry normally (default state)
-    });
-  }
+    }
+  });
 }
 
 function showLoadingState(msg){
@@ -1053,19 +1058,22 @@ function pullData(){
       if(d.outstanding)outstanding=d.outstanding;
       if(d.weekly)weeklyData=d.weekly;
       if(d.prayer)prayerData=d.prayer;
-      if(d.profile){
-        // Keep existing profile pic from localStorage (not overwrite with empty)
-        const existingPic=profileData.pic||'';
-        profileData={...d.profile,pic:existingPic};
-        localStorage.setItem('exp_profile',JSON.stringify(profileData));
-      }
       if(d.banks){bankAccounts=d.banks;localStorage.setItem('exp_banks',JSON.stringify(bankAccounts));}
       localStorage.setItem('exp_tx',JSON.stringify(transactions));
       localStorage.setItem('exp_out',JSON.stringify(outstanding));
       saveTask();savePrayer();
     }
     setSyncStatus('synced');
-    renderAll();loadProfile();
+    // Also pull profile (name + pic) from separate node
+    db.ref('users/'+userPhone+'/profile').once('value').then(psnap=>{
+      const p=psnap.val();
+      if(p){
+        if(p.name)profileData.name=p.name;
+        if(p.pic)profileData.pic=p.pic;
+        localStorage.setItem('exp_profile',JSON.stringify(profileData));
+      }
+      renderAll();loadProfile();
+    }).catch(()=>{renderAll();loadProfile();});
   }).catch(()=>{setSyncStatus('offline');renderAll();loadProfile();});
 }
 
@@ -1193,7 +1201,7 @@ window.addEventListener('load',()=>{
 function loadProfile(){
   document.getElementById('drawerNameInput').value=profileData.name||'My Name';
   const uidEl=document.getElementById('drawerUID');
-  if(uidEl&&userPhone){const shortId=userPhone.startsWith('guest_')?'Offline Mode':('ID: ...'+userPhone.slice(-6));uidEl.textContent=shortId;}
+  if(uidEl&&userPhone){uidEl.textContent='📱 '+userPhone;}
   if(profileData.pic){
     document.getElementById('drawerAvatar').innerHTML='<img src="'+profileData.pic+'" style="width:100%;height:100%;object-fit:cover;border-radius:50%;"/>';
     const btn=document.getElementById('profileBtnTop');
@@ -1206,6 +1214,10 @@ function loadProfile(){
 function saveName(){
   profileData.name=document.getElementById('drawerNameInput').value;
   localStorage.setItem('exp_profile',JSON.stringify(profileData));
+  // Sync name to Firebase immediately
+  if(userPhone&&db){
+    db.ref('users/'+userPhone+'/profile').update({name:profileData.name});
+  }
 }
 function changeProfilePic(){
   const inp=document.getElementById('profilePicInput');
@@ -1216,10 +1228,27 @@ function handleProfilePic(e){
   const file=e.target.files[0];if(!file)return;
   const r=new FileReader();
   r.onload=ev=>{
-    profileData.pic=ev.target.result;
-    saveProfile();
-    loadProfile();
-    showToast('✅ Profile picture updated!');
+    // Compress image before saving to Firebase
+    const img=new Image();
+    img.onload=()=>{
+      const canvas=document.createElement('canvas');
+      const MAX=200; // max 200px — small enough for Firebase
+      let w=img.width,h=img.height;
+      if(w>h){if(w>MAX){h=h*(MAX/w);w=MAX;}}else{if(h>MAX){w=w*(MAX/h);h=MAX;}}
+      canvas.width=w;canvas.height=h;
+      canvas.getContext('2d').drawImage(img,0,0,w,h);
+      const compressed=canvas.toDataURL('image/jpeg',0.7);
+      profileData.pic=compressed;
+      localStorage.setItem('exp_profile',JSON.stringify(profileData));
+      // Save pic to Firebase
+      if(userPhone&&db){
+        db.ref('users/'+userPhone+'/profile').update({name:profileData.name||'',pic:compressed})
+          .then(()=>showToast('✅ Profile picture saved to cloud!'))
+          .catch(()=>showToast('✅ Profile picture updated locally!'));
+      }
+      loadProfile();
+    };
+    img.src=ev.target.result;
   };
   r.readAsDataURL(file);
   e.target.value='';
