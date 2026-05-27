@@ -680,6 +680,20 @@ html,body{width:100%;overflow-x:hidden;background:var(--bg);color:var(--text);fo
         </button>
       </div>
 
+      <!-- NOTIFICATION REMINDER SECTION -->
+      <div style="background:#fff;border:1.5px solid #e2e5ed;border-radius:16px;padding:1.1rem;margin-bottom:0.85rem;box-shadow:0 2px 10px rgba(37,99,235,0.07);">
+        <div style="font-size:0.75rem;font-weight:700;color:#7c3aed;text-transform:uppercase;letter-spacing:0.07em;margin-bottom:0.85rem;">🔔 Daily Expense Reminder</div>
+        <div style="background:#f5f3ff;border-radius:10px;padding:0.75rem;margin-bottom:0.85rem;font-size:0.72rem;color:#5b21b6;line-height:1.7;">இன்னைக்கு 11 PM வரை expense entry போடல இல்லன்னா reminder வரும் 🔔</div>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.85rem;">
+          <div style="font-size:0.82rem;font-weight:600;color:#374151;">Reminder Enable பண்ணு</div>
+          <label style="position:relative;display:inline-block;width:48px;height:26px;">
+            <input type="checkbox" id="reminderToggle" onchange="toggleReminder()" style="opacity:0;width:0;height:0;position:absolute;">
+            <span id="reminderSlider" style="position:absolute;cursor:pointer;inset:0;background:#d1d5db;border-radius:26px;transition:0.3s;"><span id="reminderThumb" style="position:absolute;height:20px;width:20px;left:3px;bottom:3px;background:#fff;border-radius:50%;transition:0.3s;box-shadow:0 1px 4px rgba(0,0,0,0.2);"></span></span>
+          </label>
+        </div>
+        <div id="reminderStatus" style="font-size:0.72rem;color:#6b7280;text-align:center;min-height:1.2rem;"></div>
+        <button onclick="testNotification()" style="width:100%;padding:0.75rem;border:1.5px solid #7c3aed;border-radius:12px;background:#fff;color:#7c3aed;font-size:0.82rem;font-weight:700;cursor:pointer;font-family:Inter,sans-serif;margin-top:0.5rem;">🔔 Test Notification பண்ணு</button>
+      </div>
       <!-- HOW TO USE -->
       <div style="background:#f8faff;border:1.5px solid #e0eaff;border-radius:16px;padding:1rem;margin-bottom:1rem;">
         <div style="font-size:0.78rem;font-weight:700;color:#2563eb;margin-bottom:0.6rem;">📋 எப்படி use பண்றது:</div>
@@ -976,6 +990,7 @@ function initPinScreen(){
       if(suid) suid.textContent = '📱 ' + userPhone;
       launchApp();
       pullData();
+      setTimeout(()=>initReminder(), 2000);
     } else {
       // Session expired or first time — show login screen
       document.getElementById('pinScreen').classList.remove('hide');
@@ -2661,6 +2676,127 @@ function fmtDate(d){const p=d.split('-');return`${p[2]} ${MONTHS[parseInt(p[1])-
 function showToast(msg){
   const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');
   setTimeout(()=>t.classList.remove('show'),2500);
+}
+
+// ============================================================
+// DAILY EXPENSE REMINDER — 11 PM Notification
+// ============================================================
+let reminderInterval = null;
+
+function updateReminderUI(enabled){
+  const toggle = document.getElementById('reminderToggle');
+  const slider = document.getElementById('reminderSlider');
+  const thumb = document.getElementById('reminderThumb');
+  const status = document.getElementById('reminderStatus');
+  if(!toggle) return;
+  toggle.checked = enabled;
+  if(enabled){
+    slider.style.background = '#7c3aed';
+    thumb.style.left = '25px';
+    status.textContent = '✅ Reminder ON — இன்னைக்கு 11 PM-க்கு check பண்றோம்';
+    status.style.color = '#5b21b6';
+  } else {
+    slider.style.background = '#d1d5db';
+    thumb.style.left = '3px';
+    status.textContent = '❌ Reminder OFF';
+    status.style.color = '#6b7280';
+  }
+}
+
+function toggleReminder(){
+  const enabled = document.getElementById('reminderToggle').checked;
+  if(enabled){
+    // Request notification permission
+    if(!('Notification' in window)){
+      showToast('⚠️ இந்த browser-ல் notifications support இல்ல');
+      document.getElementById('reminderToggle').checked = false;
+      return;
+    }
+    Notification.requestPermission().then(permission => {
+      if(permission === 'granted'){
+        localStorage.setItem('exp_reminder', '1');
+        updateReminderUI(true);
+        scheduleReminderCheck();
+        showToast('✅ Reminder enabled! 11 PM-க்கு check பண்றோம்');
+      } else {
+        localStorage.setItem('exp_reminder', '0');
+        document.getElementById('reminderToggle').checked = false;
+        updateReminderUI(false);
+        showToast('⚠️ Notification permission denied — browser settings-ல் allow பண்ணுங்க');
+      }
+    });
+  } else {
+    localStorage.setItem('exp_reminder', '0');
+    updateReminderUI(false);
+    clearInterval(reminderInterval);
+    showToast('🔕 Reminder disabled');
+  }
+}
+
+function hasEntryToday(){
+  const today = new Date().toISOString().split('T')[0];
+  return transactions.some(t => t.date === today);
+}
+
+function sendReminderNotification(){
+  if(Notification.permission === 'granted'){
+    const n = new Notification('💰 Expense Tracker Reminder', {
+      body: 'இன்னைக்கு expense entry போடல! இப்பவே add பண்ணுங்க 📝',
+      icon: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text y=".9em" font-size="90">💰</text></svg>',
+      badge: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text y=".9em" font-size="90">💰</text></svg>',
+      tag: 'expense-reminder',
+      requireInteraction: true
+    });
+    n.onclick = () => { n.close(); window.focus(); };
+  }
+}
+
+function scheduleReminderCheck(){
+  clearInterval(reminderInterval);
+  // Check every minute
+  reminderInterval = setInterval(() => {
+    const enabled = localStorage.getItem('exp_reminder') === '1';
+    if(!enabled) return;
+    const now = new Date();
+    const h = now.getHours();
+    const m = now.getMinutes();
+    // Fire at 11:00 PM (23:00) — only once per day
+    if(h === 23 && m === 0){
+      const today = now.toISOString().split('T')[0];
+      const lastSent = localStorage.getItem('exp_reminder_sent');
+      if(lastSent !== today && !hasEntryToday()){
+        localStorage.setItem('exp_reminder_sent', today);
+        sendReminderNotification();
+      }
+    }
+  }, 60000); // check every 60 seconds
+}
+
+function testNotification(){
+  if(!('Notification' in window)){
+    showToast('⚠️ இந்த browser notifications support பண்றதில்லை');
+    return;
+  }
+  Notification.requestPermission().then(permission => {
+    if(permission === 'granted'){
+      new Notification('💰 Test Reminder!', {
+        body: 'Notification work ஆகுது! இன்னைக்கு 11 PM-க்கு reminder வரும் ✅',
+        icon: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text y=".9em" font-size="90">💰</text></svg>',
+        tag: 'expense-test'
+      });
+      showToast('✅ Test notification அனுப்பினோம்!');
+    } else {
+      showToast('⚠️ Permission denied — browser settings-ல் allow பண்ணுங்க');
+    }
+  });
+}
+
+function initReminder(){
+  const enabled = localStorage.getItem('exp_reminder') === '1';
+  updateReminderUI(enabled);
+  if(enabled && Notification.permission === 'granted'){
+    scheduleReminderCheck();
+  }
 }
 </script>
 </body>
