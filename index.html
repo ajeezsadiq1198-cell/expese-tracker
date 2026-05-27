@@ -2679,9 +2679,11 @@ function showToast(msg){
 }
 
 // ============================================================
-// DAILY EXPENSE REMINDER — 11 PM Notification
+// DAILY EXPENSE REMINDER — 11 PM In-App Alarm
 // ============================================================
 let reminderInterval = null;
+let alarmAudioCtx = null;
+let alarmPlaying = false;
 
 function updateReminderUI(enabled){
   const toggle = document.getElementById('reminderToggle');
@@ -2705,31 +2707,14 @@ function updateReminderUI(enabled){
 
 function toggleReminder(){
   const enabled = document.getElementById('reminderToggle').checked;
+  localStorage.setItem('exp_reminder', enabled ? '1' : '0');
+  updateReminderUI(enabled);
   if(enabled){
-    // Request notification permission
-    if(!('Notification' in window)){
-      showToast('⚠️ இந்த browser-ல் notifications support இல்ல');
-      document.getElementById('reminderToggle').checked = false;
-      return;
-    }
-    Notification.requestPermission().then(permission => {
-      if(permission === 'granted'){
-        localStorage.setItem('exp_reminder', '1');
-        updateReminderUI(true);
-        scheduleReminderCheck();
-        showToast('✅ Reminder enabled! 11 PM-க்கு check பண்றோம்');
-      } else {
-        localStorage.setItem('exp_reminder', '0');
-        document.getElementById('reminderToggle').checked = false;
-        updateReminderUI(false);
-        showToast('⚠️ Notification permission denied — browser settings-ல் allow பண்ணுங்க');
-      }
-    });
+    scheduleReminderCheck();
+    showToast('✅ Reminder ON! இன்னைக்கு 11 PM-க்கு alarm வரும்');
   } else {
-    localStorage.setItem('exp_reminder', '0');
-    updateReminderUI(false);
     clearInterval(reminderInterval);
-    showToast('🔕 Reminder disabled');
+    showToast('🔕 Reminder OFF');
   }
 }
 
@@ -2738,65 +2723,135 @@ function hasEntryToday(){
   return transactions.some(t => t.date === today);
 }
 
-function sendReminderNotification(){
-  if(Notification.permission === 'granted'){
-    const n = new Notification('💰 Expense Tracker Reminder', {
-      body: 'இன்னைக்கு expense entry போடல! இப்பவே add பண்ணுங்க 📝',
-      icon: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text y=".9em" font-size="90">💰</text></svg>',
-      badge: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text y=".9em" font-size="90">💰</text></svg>',
-      tag: 'expense-reminder',
-      requireInteraction: true
-    });
-    n.onclick = () => { n.close(); window.focus(); };
+// Alarm sound using Web Audio API
+function playAlarmSound(){
+  try {
+    alarmAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    alarmPlaying = true;
+    function beep(freq, start, dur){
+      const o = alarmAudioCtx.createOscillator();
+      const g = alarmAudioCtx.createGain();
+      o.connect(g); g.connect(alarmAudioCtx.destination);
+      o.frequency.value = freq;
+      o.type = 'sine';
+      g.gain.setValueAtTime(0.7, alarmAudioCtx.currentTime + start);
+      g.gain.exponentialRampToValueAtTime(0.001, alarmAudioCtx.currentTime + start + dur);
+      o.start(alarmAudioCtx.currentTime + start);
+      o.stop(alarmAudioCtx.currentTime + start + dur);
+    }
+    // Alarm pattern — beep beep beep
+    function playPattern(){
+      if(!alarmPlaying) return;
+      beep(880, 0, 0.3);
+      beep(880, 0.4, 0.3);
+      beep(880, 0.8, 0.3);
+      beep(1100, 1.2, 0.5);
+      setTimeout(()=>{ if(alarmPlaying) playPattern(); }, 2000);
+    }
+    playPattern();
+    // Vibrate if supported
+    if(navigator.vibrate) navigator.vibrate([500,200,500,200,500,200,1000]);
+  } catch(e){}
+}
+
+function stopAlarmSound(){
+  alarmPlaying = false;
+  if(alarmAudioCtx){
+    try { alarmAudioCtx.close(); } catch(e){}
+    alarmAudioCtx = null;
   }
+  if(navigator.vibrate) navigator.vibrate(0);
+}
+
+function showAlarmPopup(){
+  // Create full-screen alarm overlay
+  const overlay = document.createElement('div');
+  overlay.id = 'alarmOverlay';
+  overlay.style.cssText = `
+    position:fixed;inset:0;z-index:99999;
+    background:linear-gradient(160deg,#1e40af,#7c3aed);
+    display:flex;flex-direction:column;align-items:center;justify-content:center;
+    padding:2rem;animation:alarmPulse 1s ease-in-out infinite alternate;
+  `;
+  overlay.innerHTML = `
+    <style>
+      @keyframes alarmPulse{from{opacity:0.9;}to{opacity:1;}}
+      @keyframes alarmBell{0%,100%{transform:rotate(-15deg);}50%{transform:rotate(15deg);}}
+      .alarm-bell{font-size:5rem;animation:alarmBell 0.5s ease-in-out infinite;display:inline-block;margin-bottom:1rem;}
+    </style>
+    <div class="alarm-bell">🔔</div>
+    <div style="font-size:1.6rem;font-weight:800;color:#fff;margin-bottom:0.5rem;text-align:center;">
+      இன்னைக்கு Entry இல்லை!
+    </div>
+    <div style="font-size:1rem;color:rgba(255,255,255,0.85);margin-bottom:0.5rem;text-align:center;">
+      இரவு 11:00 மணி ஆச்சு
+    </div>
+    <div style="font-size:0.85rem;color:rgba(255,255,255,0.7);margin-bottom:2rem;text-align:center;">
+      இன்னைக்கு Expense entry போடல —<br/>இப்பவே add பண்ணுங்க! 📝
+    </div>
+    <button onclick="dismissAlarm()" style="
+      padding:1rem 2.5rem;border:none;border-radius:16px;
+      background:#fff;color:#7c3aed;font-size:1rem;font-weight:800;
+      cursor:pointer;font-family:Inter,sans-serif;
+      box-shadow:0 4px 20px rgba(0,0,0,0.2);margin-bottom:1rem;
+    ">✅ சரி, Entry போடுறேன்!</button>
+    <button onclick="snoozeAlarm()" style="
+      padding:0.7rem 2rem;border:2px solid rgba(255,255,255,0.5);border-radius:12px;
+      background:transparent;color:rgba(255,255,255,0.85);font-size:0.82rem;font-weight:600;
+      cursor:pointer;font-family:Inter,sans-serif;
+    ">⏰ 10 நிமிடம் பிறகு</button>
+  `;
+  document.body.appendChild(overlay);
+  playAlarmSound();
+}
+
+function dismissAlarm(){
+  stopAlarmSound();
+  const overlay = document.getElementById('alarmOverlay');
+  if(overlay) overlay.remove();
+  // Go to add entry page
+  switchTab('add');
+}
+
+function snoozeAlarm(){
+  stopAlarmSound();
+  const overlay = document.getElementById('alarmOverlay');
+  if(overlay) overlay.remove();
+  // Snooze 10 minutes
+  showToast('⏰ 10 நிமிடம் பிறகு மீண்டும் வரும்!');
+  setTimeout(()=>{
+    if(!hasEntryToday()) showAlarmPopup();
+  }, 10 * 60 * 1000);
 }
 
 function scheduleReminderCheck(){
   clearInterval(reminderInterval);
-  // Check every minute
   reminderInterval = setInterval(() => {
     const enabled = localStorage.getItem('exp_reminder') === '1';
     if(!enabled) return;
     const now = new Date();
     const h = now.getHours();
     const m = now.getMinutes();
-    // Fire at 11:00 PM (23:00) — only once per day
+    // Fire at exactly 11:00 PM (23:00)
     if(h === 23 && m === 0){
       const today = now.toISOString().split('T')[0];
       const lastSent = localStorage.getItem('exp_reminder_sent');
       if(lastSent !== today && !hasEntryToday()){
         localStorage.setItem('exp_reminder_sent', today);
-        sendReminderNotification();
+        showAlarmPopup();
       }
     }
-  }, 60000); // check every 60 seconds
+  }, 30000); // check every 30 seconds
 }
 
 function testNotification(){
-  if(!('Notification' in window)){
-    showToast('⚠️ இந்த browser notifications support பண்றதில்லை');
-    return;
-  }
-  Notification.requestPermission().then(permission => {
-    if(permission === 'granted'){
-      new Notification('💰 Test Reminder!', {
-        body: 'Notification work ஆகுது! இன்னைக்கு 11 PM-க்கு reminder வரும் ✅',
-        icon: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text y=".9em" font-size="90">💰</text></svg>',
-        tag: 'expense-test'
-      });
-      showToast('✅ Test notification அனுப்பினோம்!');
-    } else {
-      showToast('⚠️ Permission denied — browser settings-ல் allow பண்ணுங்க');
-    }
-  });
+  showAlarmPopup();
 }
 
 function initReminder(){
   const enabled = localStorage.getItem('exp_reminder') === '1';
   updateReminderUI(enabled);
-  if(enabled && Notification.permission === 'granted'){
-    scheduleReminderCheck();
-  }
+  if(enabled) scheduleReminderCheck();
 }
 </script>
 </body>
