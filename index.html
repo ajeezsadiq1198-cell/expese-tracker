@@ -12,6 +12,21 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
 <!-- reCAPTCHA for Phone Auth -->
 <script src="https://www.gstatic.com/recaptcha/api.js" async defer></script>
+<!-- EARLY SESSION CHECK: hide login instantly if already logged in -->
+<script>
+(function(){
+  try{
+    var cached=localStorage.getItem('exp_phone');
+    if(cached&&cached.startsWith('+91')){
+      // Add style to hide pinScreen immediately — before page renders
+      var s=document.createElement('style');
+      s.id='earlyHide';
+      s.textContent='#pinScreen{display:none!important;}';
+      document.head.appendChild(s);
+    }
+  }catch(e){}
+})();
+</script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
 :root{
@@ -948,14 +963,11 @@ function resendOTP(){
 // ============================================================
 function initPinScreen(){
   if(!auth) return;
-
-  // Check cached session FIRST — instant hide if token exists in localStorage
   const cachedPhone = localStorage.getItem('exp_phone');
 
-  // Listen to auth state
   auth.onAuthStateChanged(user => {
     if(user && user.phoneNumber){
-      // Already logged in — instantly hide login page, no delay
+      // Valid session — go straight to app
       userPhone = user.phoneNumber;
       localStorage.setItem('exp_uid', userPhone);
       localStorage.setItem('exp_phone', userPhone);
@@ -965,7 +977,8 @@ function initPinScreen(){
       launchApp();
       pullData();
     } else {
-      // Not logged in — show phone entry
+      // Session expired or first time — show login screen
+      document.getElementById('pinScreen').classList.remove('hide');
       if(cachedPhone && cachedPhone.startsWith('+91')){
         const digits = cachedPhone.replace('+91','');
         document.getElementById('phoneInput').value = digits;
@@ -1031,18 +1044,16 @@ function scheduleSync(){
 function pushAllData(){
   if(!userPhone||!db)return;
   const docsMeta=documents.map(d=>({id:d.id,name:d.name,size:d.size,type:d.type,added:d.added}));
-  // profile pic is base64 large data — keep in localStorage only, not Firebase
-  const profileNoPic={name:profileData.name||'',pic:''};
   const payload={
     transactions,
     outstanding,
     weekly:weeklyData,
     prayer:prayerData,
-    profile:profileNoPic,
     banks:bankAccounts,
     docsMeta,
     lastSync:Date.now()
   };
+  setSyncStatus('syncing');
   db.ref('users/'+userPhone+'/data').set(payload)
     .then(()=>setSyncStatus('synced'))
     .catch(()=>setSyncStatus('offline'));
@@ -1106,16 +1117,27 @@ function launchApp(){
 
 // AUTO START — OTP login flow
 window.addEventListener('DOMContentLoaded', function(){
+  // INSTANT LOGIN CHECK — cached phone இருந்தா உடனே login screen hide
+  const cachedPhone = localStorage.getItem('exp_phone');
+  if(cachedPhone && cachedPhone.startsWith('+91')){
+    document.getElementById('pinScreen').classList.add('hide');
+  }
   initPinScreen();
-  // Init reCAPTCHA once after Firebase loads
   setTimeout(() => initRecaptcha(), 1000);
 });
 
 // ============================================================
-// SAVE FUNCTIONS
+// SAVE FUNCTIONS — immediate Firebase sync on every change
 // ============================================================
-function save(){localStorage.setItem('exp_tx',JSON.stringify(transactions));scheduleSync();syncToSheets();}
-function saveOut(){localStorage.setItem('exp_out',JSON.stringify(outstanding));scheduleSync();}
+function save(){
+  localStorage.setItem('exp_tx',JSON.stringify(transactions));
+  pushAllData(); // immediate — no delay
+  syncToSheets();
+}
+function saveOut(){
+  localStorage.setItem('exp_out',JSON.stringify(outstanding));
+  pushAllData();
+}
 function saveDocs(){localStorage.setItem('exp_docs',JSON.stringify(documents));scheduleSync();}
 function saveProfile(){localStorage.setItem('exp_profile',JSON.stringify(profileData));scheduleSync();}
 function saveTask(){localStorage.setItem('exp_weekly',JSON.stringify(weeklyData));scheduleSync();}
@@ -2609,9 +2631,6 @@ function closeConfirm(){document.getElementById('confirmModal').classList.remove
 // HELPERS
 function fmt(n){return'₹'+Math.abs(n).toLocaleString('en-IN',{maximumFractionDigits:0});}
 function fmtDate(d){const p=d.split('-');return`${p[2]} ${MONTHS[parseInt(p[1])-1]} ${p[0]}`;}
-function save(){localStorage.setItem('exp_tx',JSON.stringify(transactions));}
-function saveDocs(){localStorage.setItem('exp_docs',JSON.stringify(documents));}
-function saveOut(){localStorage.setItem('exp_out',JSON.stringify(outstanding));}
 function showToast(msg){
   const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');
   setTimeout(()=>t.classList.remove('show'),2500);
