@@ -1062,30 +1062,53 @@ function pushAllData(){
 function pullData(){
   if(!userPhone||!db){renderAll();loadProfile();return;}
   setSyncStatus('syncing');
-  db.ref('users/'+userPhone+'/data').once('value').then(snap=>{
-    const d=snap.val();
-    if(d){
-      if(d.transactions)transactions=d.transactions;
-      if(d.outstanding)outstanding=d.outstanding;
-      if(d.weekly)weeklyData=d.weekly;
-      if(d.prayer)prayerData=d.prayer;
-      if(d.banks){bankAccounts=d.banks;localStorage.setItem('exp_banks',JSON.stringify(bankAccounts));}
-      localStorage.setItem('exp_tx',JSON.stringify(transactions));
-      localStorage.setItem('exp_out',JSON.stringify(outstanding));
-      saveTask();savePrayer();
+
+  // STEP 1: Load profile FIRST (pic + name) from Firebase
+  db.ref('users/'+userPhone+'/profile').once('value').then(psnap=>{
+    const p=psnap.val();
+    if(p){
+      if(p.name)profileData.name=p.name;
+      if(p.pic)profileData.pic=p.pic;
+      localStorage.setItem('exp_profile',JSON.stringify(profileData));
     }
-    setSyncStatus('synced');
-    // Also pull profile (name + pic) from separate node
-    db.ref('users/'+userPhone+'/profile').once('value').then(psnap=>{
-      const p=psnap.val();
-      if(p){
-        if(p.name)profileData.name=p.name;
-        if(p.pic)profileData.pic=p.pic;
-        localStorage.setItem('exp_profile',JSON.stringify(profileData));
+    loadProfile(); // Show profile immediately after fetching
+
+    // STEP 2: Load main data
+    db.ref('users/'+userPhone+'/data').once('value').then(snap=>{
+      const d=snap.val();
+      if(d){
+        if(d.transactions)transactions=d.transactions;
+        if(d.outstanding)outstanding=d.outstanding;
+        if(d.weekly)weeklyData=d.weekly;
+        if(d.prayer)prayerData=d.prayer;
+        if(d.banks){bankAccounts=d.banks;localStorage.setItem('exp_banks',JSON.stringify(bankAccounts));}
+        localStorage.setItem('exp_tx',JSON.stringify(transactions));
+        localStorage.setItem('exp_out',JSON.stringify(outstanding));
+        saveTask();savePrayer();
       }
-      renderAll();loadProfile();
-    }).catch(()=>{renderAll();loadProfile();});
-  }).catch(()=>{setSyncStatus('offline');renderAll();loadProfile();});
+      setSyncStatus('synced');
+      renderAll();
+    }).catch(()=>{setSyncStatus('offline');renderAll();});
+
+  }).catch(()=>{
+    // Profile fetch fail — still load main data
+    loadProfile();
+    db.ref('users/'+userPhone+'/data').once('value').then(snap=>{
+      const d=snap.val();
+      if(d){
+        if(d.transactions)transactions=d.transactions;
+        if(d.outstanding)outstanding=d.outstanding;
+        if(d.weekly)weeklyData=d.weekly;
+        if(d.prayer)prayerData=d.prayer;
+        if(d.banks){bankAccounts=d.banks;localStorage.setItem('exp_banks',JSON.stringify(bankAccounts));}
+        localStorage.setItem('exp_tx',JSON.stringify(transactions));
+        localStorage.setItem('exp_out',JSON.stringify(outstanding));
+        saveTask();savePrayer();
+      }
+      setSyncStatus('synced');
+      renderAll();
+    }).catch(()=>{setSyncStatus('offline');renderAll();});
+  });
 }
 
 function launchApp(){
