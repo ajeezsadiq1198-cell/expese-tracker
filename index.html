@@ -1234,11 +1234,14 @@ function loadProfile(){
   }
 }
 function saveName(){
-  profileData.name=document.getElementById('drawerNameInput').value;
+  profileData.name=document.getElementById('drawerNameInput').value.trim()||'My Name';
   localStorage.setItem('exp_profile',JSON.stringify(profileData));
-  // Sync name to Firebase immediately
   if(userPhone&&db){
-    db.ref('users/'+userPhone+'/profile').update({name:profileData.name});
+    db.ref('users/'+userPhone+'/profile').set({
+      name:profileData.name,
+      pic:profileData.pic||''
+    }).then(()=>showToast('✅ Name saved!'))
+    .catch(()=>showToast('⚠️ Save failed — check internet'));
   }
 }
 function changeProfilePic(){
@@ -1250,25 +1253,26 @@ function handleProfilePic(e){
   const file=e.target.files[0];if(!file)return;
   const r=new FileReader();
   r.onload=ev=>{
-    // Compress image before saving to Firebase
     const img=new Image();
     img.onload=()=>{
       const canvas=document.createElement('canvas');
-      const MAX=200; // max 200px — small enough for Firebase
+      const MAX=200;
       let w=img.width,h=img.height;
-      if(w>h){if(w>MAX){h=h*(MAX/w);w=MAX;}}else{if(h>MAX){w=w*(MAX/h);h=MAX;}}
+      if(w>h){if(w>MAX){h=Math.round(h*(MAX/w));w=MAX;}}else{if(h>MAX){w=Math.round(w*(MAX/h));h=MAX;}}
       canvas.width=w;canvas.height=h;
       canvas.getContext('2d').drawImage(img,0,0,w,h);
       const compressed=canvas.toDataURL('image/jpeg',0.7);
       profileData.pic=compressed;
       localStorage.setItem('exp_profile',JSON.stringify(profileData));
-      // Save pic to Firebase
-      if(userPhone&&db){
-        db.ref('users/'+userPhone+'/profile').update({name:profileData.name||'',pic:compressed})
-          .then(()=>showToast('✅ Profile picture saved to cloud!'))
-          .catch(()=>showToast('✅ Profile picture updated locally!'));
-      }
       loadProfile();
+      // Save to Firebase profile node
+      if(userPhone&&db){
+        db.ref('users/'+userPhone+'/profile').set({
+          name:profileData.name||'My Name',
+          pic:compressed
+        }).then(()=>showToast('✅ Profile picture saved!'))
+        .catch(()=>showToast('⚠️ Cloud save failed — locally saved'));
+      }
     };
     img.src=ev.target.result;
   };
