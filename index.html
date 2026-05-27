@@ -986,10 +986,20 @@ function resendOTP(){
 // INIT PIN SCREEN — Check if already logged in
 // ============================================================
 function initPinScreen(){
-  if(!auth) return;
+  if(!auth) {
+    document.getElementById('pinScreen').classList.remove('hide');
+    return;
+  }
   const cachedPhone = localStorage.getItem('exp_phone');
 
+  // Safety timeout — Firebase 6 seconds-ல் respond பண்ணல்னா login screen காட்டு
+  const authTimeout = setTimeout(() => {
+    document.getElementById('pinScreen').classList.remove('hide');
+    document.getElementById('pinStatus').textContent = '⚠️ Connection slow — மீண்டும் try பண்ணுங்க';
+  }, 6000);
+
   auth.onAuthStateChanged(user => {
+    clearTimeout(authTimeout);
     if(user && user.phoneNumber){
       // Valid session — go straight to app
       userPhone = user.phoneNumber;
@@ -2724,31 +2734,26 @@ function saveReminderTime(){
   const ampm = h < 12 ? 'காலை' : h < 17 ? 'மதியம்' : h < 20 ? 'மாலை' : 'இரவு';
   const h12 = h % 12 || 12;
   const mStr = String(m).padStart(2,'0');
-  document.getElementById('reminderTimeDisplay').textContent = `🔔 ${ampm} ${h12}:${mStr} மணிக்கு alarm வரும்`;
+  const el = document.getElementById('reminderTimeDisplay');
+  if(el) el.textContent = `🔔 ${ampm} ${h12}:${mStr} மணிக்கு alarm வரும்`;
+  // Reset today's sent flag so new time works today too
+  localStorage.removeItem('exp_reminder_sent');
   // Restart scheduler with new time
   if(localStorage.getItem('exp_reminder') === '1') scheduleReminderCheck();
+  showToast('✅ Reminder time ' + String(h12).padStart(2,'0') + ':' + mStr + ' செட் ஆச்சு!');
 }
+
+function toggleReminder(){
   const enabled = document.getElementById('reminderToggle').checked;
   localStorage.setItem('exp_reminder', enabled ? '1' : '0');
   updateReminderUI(enabled);
   if(enabled){
     scheduleReminderCheck();
-    showToast('✅ Reminder ON! இன்னைக்கு 11 PM-க்கு alarm வரும்');
+    showToast('✅ Reminder ON! alarm வரும்');
   } else {
     clearInterval(reminderInterval);
     showToast('🔕 Reminder OFF');
   }
-}
-
-function saveReminderTime(){
-  const h = parseInt(document.getElementById('reminderHour').value);
-  const m = parseInt(document.getElementById('reminderMin').value);
-  localStorage.setItem('exp_reminder_hour', h);
-  localStorage.setItem('exp_reminder_min', m);
-  updateTimeDisplay(h, m);
-  // Reset today's sent flag so new time works today too
-  localStorage.removeItem('exp_reminder_sent');
-  showToast('✅ Reminder time ' + String(h).padStart(2,'0') + ':' + String(m).padStart(2,'0') + ' செட் ஆச்சு!');
 }
 
 function updateTimeDisplay(h, m){
@@ -2768,6 +2773,7 @@ function getReminderMin(){
   const t = localStorage.getItem('exp_reminder_time') || '23:00';
   return parseInt(t.split(':')[1]);
 }
+function hasEntryToday(){
   const today = new Date().toISOString().split('T')[0];
   return transactions.some(t => t.date === today);
 }
