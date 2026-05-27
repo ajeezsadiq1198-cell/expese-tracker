@@ -683,7 +683,17 @@ html,body{width:100%;overflow-x:hidden;background:var(--bg);color:var(--text);fo
       <!-- NOTIFICATION REMINDER SECTION -->
       <div style="background:#fff;border:1.5px solid #e2e5ed;border-radius:16px;padding:1.1rem;margin-bottom:0.85rem;box-shadow:0 2px 10px rgba(37,99,235,0.07);">
         <div style="font-size:0.75rem;font-weight:700;color:#7c3aed;text-transform:uppercase;letter-spacing:0.07em;margin-bottom:0.85rem;">🔔 Daily Expense Reminder</div>
-        <div style="background:#f5f3ff;border-radius:10px;padding:0.75rem;margin-bottom:0.85rem;font-size:0.72rem;color:#5b21b6;line-height:1.7;">இன்னைக்கு 11 PM வரை expense entry போடல இல்லன்னா reminder வரும் 🔔</div>
+
+        <!-- Time Picker -->
+        <div style="background:#f5f3ff;border-radius:12px;padding:0.85rem;margin-bottom:0.85rem;">
+          <div style="font-size:0.72rem;font-weight:600;color:#5b21b6;margin-bottom:0.6rem;">⏰ Alarm Time செட் பண்ணுங்க</div>
+          <input type="time" id="reminderTimePicker" value="23:00"
+            onchange="saveReminderTime()"
+            style="width:100%;padding:0.75rem;border:1.5px solid #c4b5fd;border-radius:10px;font-size:1.3rem;font-weight:800;color:#5b21b6;background:#fff;font-family:Inter,sans-serif;text-align:center;outline:none;"/>
+          <div style="font-size:0.68rem;color:#8b5cf6;margin-top:0.5rem;text-align:center;font-weight:600;" id="reminderTimeDisplay">🔔 இரவு 11:00 மணிக்கு alarm வரும்</div>
+        </div>
+
+        <!-- Toggle -->
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.85rem;">
           <div style="font-size:0.82rem;font-weight:600;color:#374151;">Reminder Enable பண்ணு</div>
           <label style="position:relative;display:inline-block;width:48px;height:26px;">
@@ -692,7 +702,7 @@ html,body{width:100%;overflow-x:hidden;background:var(--bg);color:var(--text);fo
           </label>
         </div>
         <div id="reminderStatus" style="font-size:0.72rem;color:#6b7280;text-align:center;min-height:1.2rem;"></div>
-        <button onclick="testNotification()" style="width:100%;padding:0.75rem;border:1.5px solid #7c3aed;border-radius:12px;background:#fff;color:#7c3aed;font-size:0.82rem;font-weight:700;cursor:pointer;font-family:Inter,sans-serif;margin-top:0.5rem;">🔔 Test Notification பண்ணு</button>
+        <button onclick="testNotification()" style="width:100%;padding:0.75rem;border:1.5px solid #7c3aed;border-radius:12px;background:#fff;color:#7c3aed;font-size:0.82rem;font-weight:700;cursor:pointer;font-family:Inter,sans-serif;margin-top:0.5rem;">🔔 இப்போவே Test Alarm பண்ணு</button>
       </div>
       <!-- HOW TO USE -->
       <div style="background:#f8faff;border:1.5px solid #e0eaff;border-radius:16px;padding:1rem;margin-bottom:1rem;">
@@ -2705,7 +2715,19 @@ function updateReminderUI(enabled){
   }
 }
 
-function toggleReminder(){
+function saveReminderTime(){
+  const picker = document.getElementById('reminderTimePicker');
+  if(!picker) return;
+  const val = picker.value || '23:00';
+  localStorage.setItem('exp_reminder_time', val);
+  const [h, m] = val.split(':').map(Number);
+  const ampm = h < 12 ? 'காலை' : h < 17 ? 'மதியம்' : h < 20 ? 'மாலை' : 'இரவு';
+  const h12 = h % 12 || 12;
+  const mStr = String(m).padStart(2,'0');
+  document.getElementById('reminderTimeDisplay').textContent = `🔔 ${ampm} ${h12}:${mStr} மணிக்கு alarm வரும்`;
+  // Restart scheduler with new time
+  if(localStorage.getItem('exp_reminder') === '1') scheduleReminderCheck();
+}
   const enabled = document.getElementById('reminderToggle').checked;
   localStorage.setItem('exp_reminder', enabled ? '1' : '0');
   updateReminderUI(enabled);
@@ -2718,7 +2740,34 @@ function toggleReminder(){
   }
 }
 
-function hasEntryToday(){
+function saveReminderTime(){
+  const h = parseInt(document.getElementById('reminderHour').value);
+  const m = parseInt(document.getElementById('reminderMin').value);
+  localStorage.setItem('exp_reminder_hour', h);
+  localStorage.setItem('exp_reminder_min', m);
+  updateTimeDisplay(h, m);
+  // Reset today's sent flag so new time works today too
+  localStorage.removeItem('exp_reminder_sent');
+  showToast('✅ Reminder time ' + String(h).padStart(2,'0') + ':' + String(m).padStart(2,'0') + ' செட் ஆச்சு!');
+}
+
+function updateTimeDisplay(h, m){
+  const el = document.getElementById('reminderTimeDisplay');
+  if(!el) return;
+  const period = h >= 12 ? 'மாலை/இரவு' : 'காலை';
+  const h12 = h > 12 ? h-12 : (h === 0 ? 12 : h);
+  const mStr = String(m).padStart(2,'0');
+  el.textContent = period + ' ' + h12 + ':' + mStr + ' மணிக்கு alarm வரும்';
+}
+
+function getReminderHour(){
+  const t = localStorage.getItem('exp_reminder_time') || '23:00';
+  return parseInt(t.split(':')[0]);
+}
+function getReminderMin(){
+  const t = localStorage.getItem('exp_reminder_time') || '23:00';
+  return parseInt(t.split(':')[1]);
+}
   const today = new Date().toISOString().split('T')[0];
   return transactions.some(t => t.date === today);
 }
@@ -2832,8 +2881,9 @@ function scheduleReminderCheck(){
     const now = new Date();
     const h = now.getHours();
     const m = now.getMinutes();
-    // Fire at exactly 11:00 PM (23:00)
-    if(h === 23 && m === 0){
+    const rH = getReminderHour();
+    const rM = getReminderMin();
+    if(h === rH && m === rM){
       const today = now.toISOString().split('T')[0];
       const lastSent = localStorage.getItem('exp_reminder_sent');
       if(lastSent !== today && !hasEntryToday()){
@@ -2841,7 +2891,7 @@ function scheduleReminderCheck(){
         showAlarmPopup();
       }
     }
-  }, 30000); // check every 30 seconds
+  }, 30000);
 }
 
 function testNotification(){
@@ -2850,6 +2900,12 @@ function testNotification(){
 
 function initReminder(){
   const enabled = localStorage.getItem('exp_reminder') === '1';
+  // Load saved time into picker
+  const savedTime = localStorage.getItem('exp_reminder_time') || '23:00';
+  const picker = document.getElementById('reminderTimePicker');
+  if(picker) picker.value = savedTime;
+  // Update display label
+  saveReminderTime();
   updateReminderUI(enabled);
   if(enabled) scheduleReminderCheck();
 }
