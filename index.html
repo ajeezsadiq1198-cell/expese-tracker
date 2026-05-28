@@ -9,6 +9,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-storage-compat.js"></script>
 <!-- reCAPTCHA for Phone Auth -->
 <script src="https://www.gstatic.com/recaptcha/api.js" async defer></script>
 <!-- EARLY SESSION CHECK: hide login instantly if already logged in -->
@@ -755,6 +756,7 @@ const firebaseConfig = {
 };
 
 let db = null;
+let storage = null;
 let auth = null;
 let syncTimeout = null;
 let userPhone = null;
@@ -766,6 +768,7 @@ try {
   firebase.initializeApp(firebaseConfig);
   db = firebase.database();
   auth = firebase.auth();
+  storage = firebase.storage();
 } catch(e) {}
 
 // ============================================================
@@ -1093,11 +1096,8 @@ function pushAllData(){
   // Save main data
   db.ref('users/'+userPhone+'/data').set(payload)
     .then(()=>{
-      // Save each document's full data separately
-      const docPromises=documents.map(d=>
-        db.ref('users/'+userPhone+'/docs/'+d.id).set({id:d.id,name:d.name,size:d.size,type:d.type,added:d.added,data:d.data||''})
-      );
-      return Promise.all(docPromises);
+      // Docs are saved individually on upload — skip here
+      return Promise.resolve();
     })
     .then(()=>setSyncStatus('synced'))
     .catch(()=>setSyncStatus('offline'));
@@ -1130,11 +1130,15 @@ function pullData(){
         localStorage.setItem('exp_out',JSON.stringify(outstanding));
         saveTask();savePrayer();
       }
-      // STEP 3: Load full document data
+      // STEP 3: Load document metadata from Firebase DB
       db.ref('users/'+userPhone+'/docs').once('value').then(dsnap=>{
         const docsObj=dsnap.val();
         if(docsObj){
-          documents=Object.values(docsObj).sort((a,b)=>new Date(b.added)-new Date(a.added));
+          // Merge with local docs (local has base64 data, firebase has downloadURL)
+          const localDocs=JSON.parse(localStorage.getItem('exp_docs')||'[]');
+          const localMap={};localDocs.forEach(d=>localMap[d.id]=d);
+          const fbDocs=Object.values(docsObj).sort((a,b)=>new Date(b.added)-new Date(a.added));
+          documents=fbDocs.map(fd=>({...fd,data:(localMap[fd.id]&&localMap[fd.id].data)||''}));
           localStorage.setItem('exp_docs',JSON.stringify(documents));
         }
         setSyncStatus('synced');
@@ -1160,7 +1164,10 @@ function pullData(){
       db.ref('users/'+userPhone+'/docs').once('value').then(dsnap=>{
         const docsObj=dsnap.val();
         if(docsObj){
-          documents=Object.values(docsObj).sort((a,b)=>new Date(b.added)-new Date(a.added));
+          const localDocs=JSON.parse(localStorage.getItem('exp_docs')||'[]');
+          const localMap={};localDocs.forEach(d=>localMap[d.id]=d);
+          const fbDocs=Object.values(docsObj).sort((a,b)=>new Date(b.added)-new Date(a.added));
+          documents=fbDocs.map(fd=>({...fd,data:(localMap[fd.id]&&localMap[fd.id].data)||''}));
           localStorage.setItem('exp_docs',JSON.stringify(documents));
         }
         setSyncStatus('synced');
@@ -1663,16 +1670,30 @@ function shareReportText(){
 function triggerUpload(){document.getElementById('fileInput').click();}
 function handleFileUpload(e){
   const files=Array.from(e.target.files);
+  if(!files.length)return;
+  e.target.value='';
   files.forEach(file=>{
+    const docId='doc_'+Date.now()+'_'+Math.random().toString(36).substr(2,6);
     const reader=new FileReader();
     reader.onload=ev=>{
-      documents.unshift({id:Date.now()+Math.random(),name:file.name,size:file.size,type:file.type,data:ev.target.result,added:new Date().toISOString()});
-      saveDocs();renderDocs();
+      const base64data=ev.target.result;
+      const meta={id:docId,name:file.name,size:file.size,type:file.type,added:new Date().toISOString(),data:base64data};
+      documents.unshift(meta);
+      saveDocs();renderDocs();renderPdfBoxes();
+      showToast('📤 Cloud-ல் save பண்றோம்…');
+      // Save to Firebase Realtime DB directly (no Storage needed)
+      if(db&&userPhone){
+        db.ref('users/'+userPhone+'/docs/'+docId).set({
+          id:docId,name:file.name,size:file.size,type:file.type,
+          added:meta.added,data:base64data
+        }).then(()=>showToast('✅ '+file.name+' saved!'))
+          .catch(err=>{showToast('✅ Locally saved!');console.log('DB save err:',err);});
+      } else {
+        showToast('✅ Locally saved!');
+      }
     };
     reader.readAsDataURL(file);
   });
-  e.target.value='';
-  showToast(`✅ ${files.length} file(s) uploaded!`);
 }
 function renderDocs(){
   const list=document.getElementById('docList');
@@ -1701,7 +1722,9 @@ function fmtSize(b){if(b<1024)return b+'B';if(b<1048576)return(b/1024).toFixed(1
 function viewDoc(id){
   const doc=documents.find(d=>d.id==id);if(!doc)return;
   if(doc.type.includes('pdf')){
-    // Open PDF in new tab
+    // If Firebase Storage URL available, open directly
+    if(doc.downloadURL){window.open(doc.downloadURL,'_blank');return;}
+    // Else use local base64
     try{
       const base64=doc.data.split(',')[1];
       const binary=atob(base64);
