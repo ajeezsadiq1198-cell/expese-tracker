@@ -40,9 +40,8 @@
 html,body{width:100%;overflow-x:hidden;background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;font-size:15px;}
 
 /* SPLASH */
-#splash{position:fixed;inset:0;background:#2563eb;display:none;flex-direction:column;align-items:center;justify-content:center;z-index:9999;transition:opacity 0.5s,visibility 0.5s;}
-#splash.show{display:flex;}
-#splash.hide{opacity:0;visibility:hidden;pointer-events:none;display:none!important;}
+#splash{position:fixed;inset:0;background:#2563eb;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:9999;transition:opacity 0.5s,visibility 0.5s;}
+#splash.hide{opacity:0;visibility:hidden;pointer-events:none;}
 .splash-icon{width:72px;height:72px;background:#fff;border-radius:20px;display:flex;align-items:center;justify-content:center;font-size:2rem;box-shadow:0 8px 32px rgba(0,0,0,0.18);animation:popIn 0.6s cubic-bezier(0.34,1.56,0.64,1) both;}
 .splash-name{font-size:1.5rem;font-weight:700;color:#fff;margin-top:14px;animation:fadeUp 0.5s 0.2s ease both;}
 .splash-tag{font-size:0.72rem;color:rgba(255,255,255,0.7);margin-top:4px;letter-spacing:0.08em;animation:fadeUp 0.5s 0.3s ease both;}
@@ -481,7 +480,6 @@ html,body{width:100%;overflow-x:hidden;background:var(--bg);color:var(--text);fo
       <div class="drawer-item" onclick="closeProfile();switchTab('add')"><span class="di">➕</span>Add Transaction</div>
       <div class="drawer-item" onclick="closeProfile();switchTab('stats')"><span class="di">📊</span>Analytics</div>
       <div class="drawer-item" onclick="closeProfile();switchTab('docs')"><span class="di">📁</span>Documents</div>
-      <div class="drawer-item" onclick="closeProfile();document.getElementById('fileInput').click()"><span class="di">➕</span>Add Document</div>
       <div class="drawer-item" onclick="closeProfile();switchTab('outstanding')"><span class="di">🔔</span>Outstanding / Due</div>
       <div class="drawer-item" onclick="closeProfile();switchTab('settings')"><span class="di">⚙️</span>Settings & Backup</div>
       <div class="drawer-item" onclick="signOut()"><span class="di">🔑</span>Logout</div>
@@ -1091,15 +1089,7 @@ function pushAllData(){
     lastSync:Date.now()
   };
   setSyncStatus('syncing');
-  // Save main data
   db.ref('users/'+userPhone+'/data').set(payload)
-    .then(()=>{
-      // Save each document's full data separately
-      const docPromises=documents.map(d=>
-        db.ref('users/'+userPhone+'/docs/'+d.id).set({id:d.id,name:d.name,size:d.size,type:d.type,added:d.added,data:d.data||''})
-      );
-      return Promise.all(docPromises);
-    })
     .then(()=>setSyncStatus('synced'))
     .catch(()=>setSyncStatus('offline'));
 }
@@ -1131,16 +1121,8 @@ function pullData(){
         localStorage.setItem('exp_out',JSON.stringify(outstanding));
         saveTask();savePrayer();
       }
-      // STEP 3: Load full document data
-      db.ref('users/'+userPhone+'/docs').once('value').then(dsnap=>{
-        const docsObj=dsnap.val();
-        if(docsObj){
-          documents=Object.values(docsObj).sort((a,b)=>new Date(b.added)-new Date(a.added));
-          localStorage.setItem('exp_docs',JSON.stringify(documents));
-        }
-        setSyncStatus('synced');
-        renderAll();
-      }).catch(()=>{setSyncStatus('synced');renderAll();});
+      setSyncStatus('synced');
+      renderAll();
     }).catch(()=>{setSyncStatus('offline');renderAll();});
 
   }).catch(()=>{
@@ -1158,25 +1140,22 @@ function pullData(){
         localStorage.setItem('exp_out',JSON.stringify(outstanding));
         saveTask();savePrayer();
       }
-      db.ref('users/'+userPhone+'/docs').once('value').then(dsnap=>{
-        const docsObj=dsnap.val();
-        if(docsObj){
-          documents=Object.values(docsObj).sort((a,b)=>new Date(b.added)-new Date(a.added));
-          localStorage.setItem('exp_docs',JSON.stringify(documents));
-        }
-        setSyncStatus('synced');
-        renderAll();
-      }).catch(()=>{setSyncStatus('synced');renderAll();});
+      setSyncStatus('synced');
+      renderAll();
     }).catch(()=>{setSyncStatus('offline');renderAll();});
   });
 }
 
 function launchApp(){
   const lastTab = sessionStorage.getItem('lastTab') || 'home';
-  let returning = false;
-  try { returning = localStorage.getItem('exp_appReady') === '1'; } catch(e){}
+  const returning = localStorage.getItem('exp_appReady') === '1';
   if(returning){
-    // Refresh or returning — app shows instantly, no splash at all
+    // Refresh or back — skip splash instantly, no flash
+    const splash=document.getElementById('splash');
+    splash.style.transition='none';
+    splash.style.opacity='0';
+    splash.style.visibility='hidden';
+    splash.classList.add('hide');
     document.getElementById('app').classList.add('ready');
     const now=new Date();
     document.getElementById('topDate').textContent=now.getDate()+' '+MONTHS[now.getMonth()]+' '+now.getFullYear();
@@ -1184,13 +1163,10 @@ function launchApp(){
     setType('income');
     switchTab(lastTab);
   } else {
-    // First open ever — show splash
-    try { localStorage.setItem('exp_appReady','1'); } catch(e){}
-    const splash=document.getElementById('splash');
-    splash.classList.add('show');
+    // First open — show splash normally
+    localStorage.setItem('exp_appReady','1');
     setTimeout(()=>{
-      splash.classList.remove('show');
-      splash.classList.add('hide');
+      document.getElementById('splash').classList.add('hide');
       document.getElementById('app').classList.add('ready');
       const now=new Date();
       document.getElementById('topDate').textContent=now.getDate()+' '+MONTHS[now.getMonth()]+' '+now.getFullYear();
@@ -1745,10 +1721,7 @@ function shareDoc(id){
 }
 function confirmDeleteDoc(id){
   showConfirm('Delete Document?','This document will be permanently removed.',()=>{
-    documents=documents.filter(d=>String(d.id)!==String(id));
-    saveDocs();renderDocs();showToast('🗑️ Removed!');
-    // Delete from Firebase too
-    if(userPhone&&db) db.ref('users/'+userPhone+'/docs/'+id).remove().catch(()=>{});
+    documents=documents.filter(d=>String(d.id)!==String(id));saveDocs();renderDocs();showToast('🗑️ Removed!');
   });
 }
 
