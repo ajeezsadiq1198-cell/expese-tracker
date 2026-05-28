@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1701,12 +1700,8 @@ function docIcon(type){
 function fmtSize(b){if(b<1024)return b+'B';if(b<1048576)return(b/1024).toFixed(1)+'KB';return(b/1048576).toFixed(1)+'MB';}
 function viewDoc(id){
   const doc=documents.find(d=>d.id==id);if(!doc)return;
-  document.getElementById('dvName').textContent=doc.name;
-  const content=document.getElementById('dvContent');
-  if(doc.type.includes('image')){
-    content.innerHTML=`<img src="${doc.data}" style="width:100%;height:auto;display:block;"/>`;
-  } else if(doc.type.includes('pdf')){
-    // Convert base64 to blob URL for mobile compatibility
+  if(doc.type.includes('pdf')){
+    // Open PDF in new tab
     try{
       const base64=doc.data.split(',')[1];
       const binary=atob(base64);
@@ -1714,19 +1709,18 @@ function viewDoc(id){
       for(let i=0;i<binary.length;i++)bytes[i]=binary.charCodeAt(i);
       const blob=new Blob([bytes],{type:'application/pdf'});
       const blobUrl=URL.createObjectURL(blob);
-      content.innerHTML=`<iframe src="${blobUrl}" style="width:100%;height:100%;border:none;"></iframe>`;
-      // Cleanup blob URL after load
-      setTimeout(()=>URL.revokeObjectURL(blobUrl),60000);
-    }catch(e){
-      // Fallback: open in new tab
-      content.innerHTML=`<div style="padding:2rem;color:#fff;text-align:center;">
-        <div style="font-size:3rem;margin-bottom:1rem;">📄</div>
-        <p style="margin-bottom:1.2rem;">${doc.name}</p>
-        <button onclick="downloadDoc('${doc.id}')" style="background:#fff;color:#2563eb;border:none;border-radius:10px;padding:0.7rem 1.5rem;font-weight:700;font-size:0.9rem;cursor:pointer;">⬇️ Download to View</button>
-      </div>`;
-    }
+      window.open(blobUrl,'_blank');
+      setTimeout(()=>URL.revokeObjectURL(blobUrl),30000);
+    }catch(e){showToast('⚠️ PDF open ஆகல — Download பண்ணுங்க');}
+    return;
+  }
+  // Image & others — show in viewer
+  document.getElementById('dvName').textContent=doc.name;
+  const content=document.getElementById('dvContent');
+  if(doc.type.includes('image')){
+    content.innerHTML=`<img src="${doc.data}" style="width:100%;height:auto;display:block;"/>`;
   } else {
-    content.innerHTML=`<div style="padding:2rem;color:#fff;text-align:center;"><div style="font-size:3rem;margin-bottom:1rem;">${docIcon(doc.type)}</div><p>${doc.name}</p><p style="margin-top:0.5rem;font-size:0.8rem;opacity:0.7;">Preview not available. Download to open.</p></div>`;
+    content.innerHTML=`<div style="padding:2rem;color:#fff;text-align:center;"><div style="font-size:3rem;margin-bottom:1rem;">${docIcon(doc.type)}</div><p>${doc.name}</p><p style="margin-top:0.5rem;font-size:0.8rem;opacity:0.7;">Preview not available. Download to open.</p><button onclick="downloadDoc('${doc.id}')" style="margin-top:1rem;background:#fff;color:#2563eb;border:none;border-radius:10px;padding:0.7rem 1.5rem;font-weight:700;cursor:pointer;">⬇️ Download</button></div>`;
   }
   document.getElementById('docViewer').classList.add('show');
 }
