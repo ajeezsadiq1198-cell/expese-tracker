@@ -1150,8 +1150,12 @@ function launchApp(){
   const lastTab = sessionStorage.getItem('lastTab') || 'home';
   const returning = sessionStorage.getItem('appReady') === '1';
   if(returning){
-    // Back from PDF — skip splash, go directly to last tab
-    document.getElementById('splash').classList.add('hide');
+    // Refresh or back — skip splash instantly, no flash
+    const splash=document.getElementById('splash');
+    splash.style.transition='none';
+    splash.style.opacity='0';
+    splash.style.visibility='hidden';
+    splash.classList.add('hide');
     document.getElementById('app').classList.add('ready');
     const now=new Date();
     document.getElementById('topDate').textContent=now.getDate()+' '+MONTHS[now.getMonth()]+' '+now.getFullYear();
@@ -1975,15 +1979,24 @@ function shareOutstandingImage(){
 
 // TASK - WEEKLY BALANCE TRACKER
 function getWeekKey(){
-  var now=new Date(),day=now.getDay();
-  var mon=new Date(now);mon.setDate(now.getDate()-(day===0?6:day-1));
-  return mon.toISOString().split('T')[0];
+  var now=new Date();
+  // Use local date parts to avoid UTC midnight shift issues
+  var localDate=new Date(now.getFullYear(),now.getMonth(),now.getDate());
+  var day=localDate.getDay(); // 0=Sun,1=Mon,...,6=Sat
+  var diffToMon=(day===0)?6:day-1;
+  var mon=new Date(localDate);mon.setDate(localDate.getDate()-diffToMon);
+  var y=mon.getFullYear(),m=String(mon.getMonth()+1).padStart(2,'0'),d=String(mon.getDate()).padStart(2,'0');
+  return y+'-'+m+'-'+d;
 }
 function getWeekLabel(){
-  var now=new Date(),day=now.getDay();
-  var mon=new Date(now);mon.setDate(now.getDate()-(day===0?6:day-1));
+  var now=new Date();
+  var localDate=new Date(now.getFullYear(),now.getMonth(),now.getDate());
+  var day=localDate.getDay();
+  var diffToMon=(day===0)?6:day-1;
+  var mon=new Date(localDate);mon.setDate(localDate.getDate()-diffToMon);
   var sun=new Date(mon);sun.setDate(mon.getDate()+6);
-  return fmtDate(mon.toISOString().split('T')[0])+' to '+fmtDate(sun.toISOString().split('T')[0]);
+  var fmt2=function(d){var y=d.getFullYear(),m=String(d.getMonth()+1).padStart(2,'0'),dd=String(d.getDate()).padStart(2,'0');return fmtDate(y+'-'+m+'-'+dd);};
+  return fmt2(mon)+' to '+fmt2(sun);
 }
 function saveTaskField(dayIdx,field,val){
   var wk=getWeekKey();
