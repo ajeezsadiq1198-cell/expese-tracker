@@ -481,6 +481,7 @@ html,body{width:100%;overflow-x:hidden;background:var(--bg);color:var(--text);fo
       <div class="drawer-item" onclick="closeProfile();switchTab('add')"><span class="di">➕</span>Add Transaction</div>
       <div class="drawer-item" onclick="closeProfile();switchTab('stats')"><span class="di">📊</span>Analytics</div>
       <div class="drawer-item" onclick="closeProfile();switchTab('docs')"><span class="di">📁</span>Documents</div>
+      <div class="drawer-item" onclick="closeProfile();document.getElementById('fileInput').click()"><span class="di">➕</span>Add Document</div>
       <div class="drawer-item" onclick="closeProfile();switchTab('outstanding')"><span class="di">🔔</span>Outstanding / Due</div>
       <div class="drawer-item" onclick="closeProfile();switchTab('settings')"><span class="di">⚙️</span>Settings & Backup</div>
       <div class="drawer-item" onclick="signOut()"><span class="di">🔑</span>Logout</div>
@@ -1090,7 +1091,15 @@ function pushAllData(){
     lastSync:Date.now()
   };
   setSyncStatus('syncing');
+  // Save main data
   db.ref('users/'+userPhone+'/data').set(payload)
+    .then(()=>{
+      // Save each document's full data separately
+      const docPromises=documents.map(d=>
+        db.ref('users/'+userPhone+'/docs/'+d.id).set({id:d.id,name:d.name,size:d.size,type:d.type,added:d.added,data:d.data||''})
+      );
+      return Promise.all(docPromises);
+    })
     .then(()=>setSyncStatus('synced'))
     .catch(()=>setSyncStatus('offline'));
 }
@@ -1122,8 +1131,16 @@ function pullData(){
         localStorage.setItem('exp_out',JSON.stringify(outstanding));
         saveTask();savePrayer();
       }
-      setSyncStatus('synced');
-      renderAll();
+      // STEP 3: Load full document data
+      db.ref('users/'+userPhone+'/docs').once('value').then(dsnap=>{
+        const docsObj=dsnap.val();
+        if(docsObj){
+          documents=Object.values(docsObj).sort((a,b)=>new Date(b.added)-new Date(a.added));
+          localStorage.setItem('exp_docs',JSON.stringify(documents));
+        }
+        setSyncStatus('synced');
+        renderAll();
+      }).catch(()=>{setSyncStatus('synced');renderAll();});
     }).catch(()=>{setSyncStatus('offline');renderAll();});
 
   }).catch(()=>{
@@ -1141,8 +1158,15 @@ function pullData(){
         localStorage.setItem('exp_out',JSON.stringify(outstanding));
         saveTask();savePrayer();
       }
-      setSyncStatus('synced');
-      renderAll();
+      db.ref('users/'+userPhone+'/docs').once('value').then(dsnap=>{
+        const docsObj=dsnap.val();
+        if(docsObj){
+          documents=Object.values(docsObj).sort((a,b)=>new Date(b.added)-new Date(a.added));
+          localStorage.setItem('exp_docs',JSON.stringify(documents));
+        }
+        setSyncStatus('synced');
+        renderAll();
+      }).catch(()=>{setSyncStatus('synced');renderAll();});
     }).catch(()=>{setSyncStatus('offline');renderAll();});
   });
 }
@@ -1721,7 +1745,10 @@ function shareDoc(id){
 }
 function confirmDeleteDoc(id){
   showConfirm('Delete Document?','This document will be permanently removed.',()=>{
-    documents=documents.filter(d=>String(d.id)!==String(id));saveDocs();renderDocs();showToast('🗑️ Removed!');
+    documents=documents.filter(d=>String(d.id)!==String(id));
+    saveDocs();renderDocs();showToast('🗑️ Removed!');
+    // Delete from Firebase too
+    if(userPhone&&db) db.ref('users/'+userPhone+'/docs/'+id).remove().catch(()=>{});
   });
 }
 
