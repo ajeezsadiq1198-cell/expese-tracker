@@ -1148,7 +1148,7 @@ function pullData(){
 
 function launchApp(){
   const lastTab = sessionStorage.getItem('lastTab') || 'home';
-  const returning = sessionStorage.getItem('appReady') === '1';
+  const returning = localStorage.getItem('exp_appReady') === '1';
   if(returning){
     // Refresh or back — skip splash instantly, no flash
     const splash=document.getElementById('splash');
@@ -1164,7 +1164,7 @@ function launchApp(){
     switchTab(lastTab);
   } else {
     // First open — show splash normally
-    sessionStorage.setItem('appReady','1');
+    localStorage.setItem('exp_appReady','1');
     setTimeout(()=>{
       document.getElementById('splash').classList.add('hide');
       document.getElementById('app').classList.add('ready');
