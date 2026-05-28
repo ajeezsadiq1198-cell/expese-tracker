@@ -40,8 +40,9 @@
 html,body{width:100%;overflow-x:hidden;background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;font-size:15px;}
 
 /* SPLASH */
-#splash{position:fixed;inset:0;background:#2563eb;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:9999;transition:opacity 0.5s,visibility 0.5s;}
-#splash.hide{opacity:0;visibility:hidden;pointer-events:none;}
+#splash{position:fixed;inset:0;background:#2563eb;display:none;flex-direction:column;align-items:center;justify-content:center;z-index:9999;transition:opacity 0.5s,visibility 0.5s;}
+#splash.show{display:flex;}
+#splash.hide{opacity:0;visibility:hidden;pointer-events:none;display:none!important;}
 .splash-icon{width:72px;height:72px;background:#fff;border-radius:20px;display:flex;align-items:center;justify-content:center;font-size:2rem;box-shadow:0 8px 32px rgba(0,0,0,0.18);animation:popIn 0.6s cubic-bezier(0.34,1.56,0.64,1) both;}
 .splash-name{font-size:1.5rem;font-weight:700;color:#fff;margin-top:14px;animation:fadeUp 0.5s 0.2s ease both;}
 .splash-tag{font-size:0.72rem;color:rgba(255,255,255,0.7);margin-top:4px;letter-spacing:0.08em;animation:fadeUp 0.5s 0.3s ease both;}
@@ -480,6 +481,7 @@ html,body{width:100%;overflow-x:hidden;background:var(--bg);color:var(--text);fo
       <div class="drawer-item" onclick="closeProfile();switchTab('add')"><span class="di">➕</span>Add Transaction</div>
       <div class="drawer-item" onclick="closeProfile();switchTab('stats')"><span class="di">📊</span>Analytics</div>
       <div class="drawer-item" onclick="closeProfile();switchTab('docs')"><span class="di">📁</span>Documents</div>
+      <div class="drawer-item" onclick="closeProfile();document.getElementById('fileInput').click()"><span class="di">➕</span>Add Document</div>
       <div class="drawer-item" onclick="closeProfile();switchTab('outstanding')"><span class="di">🔔</span>Outstanding / Due</div>
       <div class="drawer-item" onclick="closeProfile();switchTab('settings')"><span class="di">⚙️</span>Settings & Backup</div>
       <div class="drawer-item" onclick="signOut()"><span class="di">🔑</span>Logout</div>
@@ -563,7 +565,7 @@ html,body{width:100%;overflow-x:hidden;background:var(--bg);color:var(--text);fo
   <div class="page" id="page-docs">
     <div style="padding:0.7rem 0.85rem 0.3rem;display:flex;align-items:center;justify-content:space-between;">
       <div style="font-size:1rem;font-weight:700;color:var(--text);">📁 My Documents</div>
-      <div style="font-size:0.68rem;color:var(--muted);">Tap to open PDF</div>
+      <div style="font-size:0.68rem;color:var(--muted);">Profile → Add Document</div>
     </div>
     <div class="pdf-grid" id="pdfBoxGrid"></div>
   </div>
@@ -1089,7 +1091,15 @@ function pushAllData(){
     lastSync:Date.now()
   };
   setSyncStatus('syncing');
+  // Save main data
   db.ref('users/'+userPhone+'/data').set(payload)
+    .then(()=>{
+      // Save each document's full data separately
+      const docPromises=documents.map(d=>
+        db.ref('users/'+userPhone+'/docs/'+d.id).set({id:d.id,name:d.name,size:d.size,type:d.type,added:d.added,data:d.data||''})
+      );
+      return Promise.all(docPromises);
+    })
     .then(()=>setSyncStatus('synced'))
     .catch(()=>setSyncStatus('offline'));
 }
@@ -1121,8 +1131,16 @@ function pullData(){
         localStorage.setItem('exp_out',JSON.stringify(outstanding));
         saveTask();savePrayer();
       }
-      setSyncStatus('synced');
-      renderAll();
+      // STEP 3: Load full document data
+      db.ref('users/'+userPhone+'/docs').once('value').then(dsnap=>{
+        const docsObj=dsnap.val();
+        if(docsObj){
+          documents=Object.values(docsObj).sort((a,b)=>new Date(b.added)-new Date(a.added));
+          localStorage.setItem('exp_docs',JSON.stringify(documents));
+        }
+        setSyncStatus('synced');
+        renderAll();
+      }).catch(()=>{setSyncStatus('synced');renderAll();});
     }).catch(()=>{setSyncStatus('offline');renderAll();});
 
   }).catch(()=>{
@@ -1140,22 +1158,25 @@ function pullData(){
         localStorage.setItem('exp_out',JSON.stringify(outstanding));
         saveTask();savePrayer();
       }
-      setSyncStatus('synced');
-      renderAll();
+      db.ref('users/'+userPhone+'/docs').once('value').then(dsnap=>{
+        const docsObj=dsnap.val();
+        if(docsObj){
+          documents=Object.values(docsObj).sort((a,b)=>new Date(b.added)-new Date(a.added));
+          localStorage.setItem('exp_docs',JSON.stringify(documents));
+        }
+        setSyncStatus('synced');
+        renderAll();
+      }).catch(()=>{setSyncStatus('synced');renderAll();});
     }).catch(()=>{setSyncStatus('offline');renderAll();});
   });
 }
 
 function launchApp(){
   const lastTab = sessionStorage.getItem('lastTab') || 'home';
-  const returning = localStorage.getItem('exp_appReady') === '1';
+  let returning = false;
+  try { returning = sessionStorage.getItem('exp_splashDone') === '1'; } catch(e){}
   if(returning){
-    // Refresh or back — skip splash instantly, no flash
-    const splash=document.getElementById('splash');
-    splash.style.transition='none';
-    splash.style.opacity='0';
-    splash.style.visibility='hidden';
-    splash.classList.add('hide');
+    // Refresh — skip splash
     document.getElementById('app').classList.add('ready');
     const now=new Date();
     document.getElementById('topDate').textContent=now.getDate()+' '+MONTHS[now.getMonth()]+' '+now.getFullYear();
@@ -1163,10 +1184,13 @@ function launchApp(){
     setType('income');
     switchTab(lastTab);
   } else {
-    // First open — show splash normally
-    localStorage.setItem('exp_appReady','1');
+    // Fresh open — show splash
+    try { sessionStorage.setItem('exp_splashDone','1'); } catch(e){}
+    const splash=document.getElementById('splash');
+    splash.classList.add('show');
     setTimeout(()=>{
-      document.getElementById('splash').classList.add('hide');
+      splash.classList.remove('show');
+      splash.classList.add('hide');
       document.getElementById('app').classList.add('ready');
       const now=new Date();
       document.getElementById('topDate').textContent=now.getDate()+' '+MONTHS[now.getMonth()]+' '+now.getFullYear();
@@ -1721,7 +1745,10 @@ function shareDoc(id){
 }
 function confirmDeleteDoc(id){
   showConfirm('Delete Document?','This document will be permanently removed.',()=>{
-    documents=documents.filter(d=>String(d.id)!==String(id));saveDocs();renderDocs();showToast('🗑️ Removed!');
+    documents=documents.filter(d=>String(d.id)!==String(id));
+    saveDocs();renderDocs();showToast('🗑️ Removed!');
+    // Delete from Firebase too
+    if(userPhone&&db) db.ref('users/'+userPhone+'/docs/'+id).remove().catch(()=>{});
   });
 }
 
@@ -2378,38 +2405,36 @@ function savePrayerReport(type){
   }
 }
 
-// PDF LINK BOXES — Edit the URL in each box below to your Google Drive PDF link
-const PDF_DOCS = [
-  { name: 'Aadhar Card',        icon: '🪪', color: '#2563eb', url: '' },
-  { name: 'PAN Card',           icon: '💳', color: '#7c3aed', url: '' },
-  { name: 'Driving Licence',    icon: '🚗', color: '#059669', url: 'https://drive.google.com/file/d/1--qXacOfODD850fo19MX8M4t29XgsiHL/view?usp=drivesdk' },
-  { name: 'Passport',           icon: '📘', color: '#dc2626', url: '' },
-  { name: 'Bank Passbook',      icon: '🏦', color: '#d97706', url: '' },
-  { name: 'Insurance Policy',   icon: '🛡️', color: '#0891b2', url: '' },
-  { name: 'Property Document',  icon: '🏠', color: '#be185d', url: '' },
-  { name: 'Salary Slip',        icon: '💰', color: '#1d4ed8', url: '' },
-  { name: 'RC Book',            icon: '📋', color: '#9333ea', url: '' },
-  { name: 'Other Document',     icon: '📄', color: '#374151', url: '' },
-];
-
+// PDF BOXES — Show uploaded documents
 function renderPdfBoxes(){
   const grid=document.getElementById('pdfBoxGrid');
   if(!grid)return;
-  grid.innerHTML=PDF_DOCS.map((doc,i)=>`
-    <div class="pdf-box" onclick="openPdfDoc(${i})" style="border-left:4px solid ${doc.color};">
-      <div class="pdf-box-icon" style="background:${doc.color}18;">${doc.icon}</div>
-      <div class="pdf-box-body">
-        <div class="pdf-box-name">${doc.name}</div>
-        <div class="pdf-box-sub" style="color:${doc.color};">${doc.url ? '📎 Tap to open PDF' : '🔗 Link not set'}</div>
+  if(!documents.length){
+    grid.innerHTML=`<div style="text-align:center;padding:3rem 1rem;color:#6b7280;">
+      <div style="font-size:3rem;margin-bottom:0.8rem;">📁</div>
+      <div style="font-weight:600;margin-bottom:0.4rem;">No documents yet</div>
+      <div style="font-size:0.8rem;">Profile menu → Add Document பண்ணுங்க</div>
+    </div>`;
+    return;
+  }
+  const colors=['#2563eb','#7c3aed','#059669','#dc2626','#d97706','#0891b2','#be185d','#1d4ed8','#9333ea','#374151'];
+  grid.innerHTML=documents.map((d,i)=>{
+    const color=colors[i%colors.length];
+    const icon=d.type.includes('pdf')?'📄':d.type.includes('image')?'🖼️':d.type.includes('word')?'📝':d.type.includes('sheet')?'📊':'📎';
+    const size=d.size<1048576?(d.size/1024).toFixed(1)+'KB':(d.size/1048576).toFixed(1)+'MB';
+    const date=new Date(d.added).toLocaleDateString('en-IN');
+    return`<div class="pdf-box" style="border-left:4px solid ${color};">
+      <div class="pdf-box-icon" style="background:${color}18;">${icon}</div>
+      <div class="pdf-box-body" onclick="viewDoc('${d.id}')" style="flex:1;cursor:pointer;">
+        <div class="pdf-box-name">${d.name}</div>
+        <div class="pdf-box-sub" style="color:${color};">${size} · ${date}</div>
       </div>
-      <div class="pdf-box-arrow" style="color:${doc.color};">›</div>
-    </div>`).join('');
-}
-
-function openPdfDoc(i){
-  const doc=PDF_DOCS[i];
-  if(!doc.url){showToast('⚠️ '+doc.name+' link not set');return;}
-  window.open(doc.url,'_blank');
+      <div style="display:flex;gap:6px;align-items:center;">
+        <button onclick="downloadDoc('${d.id}')" style="background:none;border:none;font-size:1.2rem;cursor:pointer;padding:4px;">⬇️</button>
+        <button onclick="confirmDeleteDoc('${d.id}')" style="background:none;border:none;font-size:1.1rem;cursor:pointer;padding:4px;color:#dc2626;">✕</button>
+      </div>
+    </div>`;
+  }).join('');
 }
 
 // ============================================================
