@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -9,7 +10,6 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-storage-compat.js"></script>
 <!-- reCAPTCHA for Phone Auth -->
 <script src="https://www.gstatic.com/recaptcha/api.js" async defer></script>
 <!-- EARLY SESSION CHECK: hide login instantly if already logged in -->
@@ -481,7 +481,6 @@ html,body{width:100%;overflow-x:hidden;background:var(--bg);color:var(--text);fo
       <div class="drawer-item" onclick="closeProfile();switchTab('add')"><span class="di">➕</span>Add Transaction</div>
       <div class="drawer-item" onclick="closeProfile();switchTab('stats')"><span class="di">📊</span>Analytics</div>
       <div class="drawer-item" onclick="closeProfile();switchTab('docs')"><span class="di">📁</span>Documents</div>
-      <div class="drawer-item" onclick="closeProfile();document.getElementById('fileInput').click()"><span class="di">➕</span>Add Document</div>
       <div class="drawer-item" onclick="closeProfile();switchTab('outstanding')"><span class="di">🔔</span>Outstanding / Due</div>
       <div class="drawer-item" onclick="closeProfile();switchTab('settings')"><span class="di">⚙️</span>Settings & Backup</div>
       <div class="drawer-item" onclick="signOut()"><span class="di">🔑</span>Logout</div>
@@ -565,7 +564,7 @@ html,body{width:100%;overflow-x:hidden;background:var(--bg);color:var(--text);fo
   <div class="page" id="page-docs">
     <div style="padding:0.7rem 0.85rem 0.3rem;display:flex;align-items:center;justify-content:space-between;">
       <div style="font-size:1rem;font-weight:700;color:var(--text);">📁 My Documents</div>
-      <div style="font-size:0.68rem;color:var(--muted);">Profile → Add Document</div>
+      <div style="font-size:0.68rem;color:var(--muted);">Tap to open PDF</div>
     </div>
     <div class="pdf-grid" id="pdfBoxGrid"></div>
   </div>
@@ -756,7 +755,6 @@ const firebaseConfig = {
 };
 
 let db = null;
-let storage = null;
 let auth = null;
 let syncTimeout = null;
 let userPhone = null;
@@ -768,7 +766,6 @@ try {
   firebase.initializeApp(firebaseConfig);
   db = firebase.database();
   auth = firebase.auth();
-  storage = firebase.storage();
 } catch(e) {}
 
 // ============================================================
@@ -1093,12 +1090,7 @@ function pushAllData(){
     lastSync:Date.now()
   };
   setSyncStatus('syncing');
-  // Save main data
   db.ref('users/'+userPhone+'/data').set(payload)
-    .then(()=>{
-      // Docs are saved individually on upload — skip here
-      return Promise.resolve();
-    })
     .then(()=>setSyncStatus('synced'))
     .catch(()=>setSyncStatus('offline'));
 }
@@ -1130,20 +1122,8 @@ function pullData(){
         localStorage.setItem('exp_out',JSON.stringify(outstanding));
         saveTask();savePrayer();
       }
-      // STEP 3: Load document metadata from Firebase DB
-      db.ref('users/'+userPhone+'/docs').once('value').then(dsnap=>{
-        const docsObj=dsnap.val();
-        if(docsObj){
-          // Merge with local docs (local has base64 data, firebase has downloadURL)
-          const localDocs=JSON.parse(localStorage.getItem('exp_docs')||'[]');
-          const localMap={};localDocs.forEach(d=>localMap[d.id]=d);
-          const fbDocs=Object.values(docsObj).sort((a,b)=>new Date(b.added)-new Date(a.added));
-          documents=fbDocs.map(fd=>({...fd,data:(localMap[fd.id]&&localMap[fd.id].data)||''}));
-          localStorage.setItem('exp_docs',JSON.stringify(documents));
-        }
-        setSyncStatus('synced');
-        renderAll();
-      }).catch(()=>{setSyncStatus('synced');renderAll();});
+      setSyncStatus('synced');
+      renderAll();
     }).catch(()=>{setSyncStatus('offline');renderAll();});
 
   }).catch(()=>{
@@ -1161,18 +1141,8 @@ function pullData(){
         localStorage.setItem('exp_out',JSON.stringify(outstanding));
         saveTask();savePrayer();
       }
-      db.ref('users/'+userPhone+'/docs').once('value').then(dsnap=>{
-        const docsObj=dsnap.val();
-        if(docsObj){
-          const localDocs=JSON.parse(localStorage.getItem('exp_docs')||'[]');
-          const localMap={};localDocs.forEach(d=>localMap[d.id]=d);
-          const fbDocs=Object.values(docsObj).sort((a,b)=>new Date(b.added)-new Date(a.added));
-          documents=fbDocs.map(fd=>({...fd,data:(localMap[fd.id]&&localMap[fd.id].data)||''}));
-          localStorage.setItem('exp_docs',JSON.stringify(documents));
-        }
-        setSyncStatus('synced');
-        renderAll();
-      }).catch(()=>{setSyncStatus('synced');renderAll();});
+      setSyncStatus('synced');
+      renderAll();
     }).catch(()=>{setSyncStatus('offline');renderAll();});
   });
 }
@@ -1180,9 +1150,9 @@ function pullData(){
 function launchApp(){
   const lastTab = sessionStorage.getItem('lastTab') || 'home';
   let returning = false;
-  try { returning = sessionStorage.getItem('exp_splashDone') === '1'; } catch(e){}
+  try { returning = localStorage.getItem('exp_appReady') === '1'; } catch(e){}
   if(returning){
-    // Refresh — skip splash
+    // Refresh or returning — app shows instantly, no splash at all
     document.getElementById('app').classList.add('ready');
     const now=new Date();
     document.getElementById('topDate').textContent=now.getDate()+' '+MONTHS[now.getMonth()]+' '+now.getFullYear();
@@ -1190,8 +1160,8 @@ function launchApp(){
     setType('income');
     switchTab(lastTab);
   } else {
-    // Fresh open — show splash
-    try { sessionStorage.setItem('exp_splashDone','1'); } catch(e){}
+    // First open ever — show splash
+    try { localStorage.setItem('exp_appReady','1'); } catch(e){}
     const splash=document.getElementById('splash');
     splash.classList.add('show');
     setTimeout(()=>{
@@ -1670,30 +1640,16 @@ function shareReportText(){
 function triggerUpload(){document.getElementById('fileInput').click();}
 function handleFileUpload(e){
   const files=Array.from(e.target.files);
-  if(!files.length)return;
-  e.target.value='';
   files.forEach(file=>{
-    const docId='doc_'+Date.now()+'_'+Math.random().toString(36).substr(2,6);
     const reader=new FileReader();
     reader.onload=ev=>{
-      const base64data=ev.target.result;
-      const meta={id:docId,name:file.name,size:file.size,type:file.type,added:new Date().toISOString(),data:base64data};
-      documents.unshift(meta);
-      saveDocs();renderDocs();renderPdfBoxes();
-      showToast('📤 Cloud-ல் save பண்றோம்…');
-      // Save to Firebase Realtime DB directly (no Storage needed)
-      if(db&&userPhone){
-        db.ref('users/'+userPhone+'/docs/'+docId).set({
-          id:docId,name:file.name,size:file.size,type:file.type,
-          added:meta.added,data:base64data
-        }).then(()=>showToast('✅ '+file.name+' saved!'))
-          .catch(err=>{showToast('✅ Locally saved!');console.log('DB save err:',err);});
-      } else {
-        showToast('✅ Locally saved!');
-      }
+      documents.unshift({id:Date.now()+Math.random(),name:file.name,size:file.size,type:file.type,data:ev.target.result,added:new Date().toISOString()});
+      saveDocs();renderDocs();
     };
     reader.readAsDataURL(file);
   });
+  e.target.value='';
+  showToast(`✅ ${files.length} file(s) uploaded!`);
 }
 function renderDocs(){
   const list=document.getElementById('docList');
@@ -1721,29 +1677,14 @@ function docIcon(type){
 function fmtSize(b){if(b<1024)return b+'B';if(b<1048576)return(b/1024).toFixed(1)+'KB';return(b/1048576).toFixed(1)+'MB';}
 function viewDoc(id){
   const doc=documents.find(d=>d.id==id);if(!doc)return;
-  if(doc.type.includes('pdf')){
-    // If Firebase Storage URL available, open directly
-    if(doc.downloadURL){window.open(doc.downloadURL,'_blank');return;}
-    // Else use local base64
-    try{
-      const base64=doc.data.split(',')[1];
-      const binary=atob(base64);
-      const bytes=new Uint8Array(binary.length);
-      for(let i=0;i<binary.length;i++)bytes[i]=binary.charCodeAt(i);
-      const blob=new Blob([bytes],{type:'application/pdf'});
-      const blobUrl=URL.createObjectURL(blob);
-      window.open(blobUrl,'_blank');
-      setTimeout(()=>URL.revokeObjectURL(blobUrl),30000);
-    }catch(e){showToast('⚠️ PDF open ஆகல — Download பண்ணுங்க');}
-    return;
-  }
-  // Image & others — show in viewer
   document.getElementById('dvName').textContent=doc.name;
   const content=document.getElementById('dvContent');
   if(doc.type.includes('image')){
     content.innerHTML=`<img src="${doc.data}" style="width:100%;height:auto;display:block;"/>`;
+  } else if(doc.type.includes('pdf')){
+    content.innerHTML=`<iframe src="${doc.data}" style="width:100%;height:100%;border:none;"></iframe>`;
   } else {
-    content.innerHTML=`<div style="padding:2rem;color:#fff;text-align:center;"><div style="font-size:3rem;margin-bottom:1rem;">${docIcon(doc.type)}</div><p>${doc.name}</p><p style="margin-top:0.5rem;font-size:0.8rem;opacity:0.7;">Preview not available. Download to open.</p><button onclick="downloadDoc('${doc.id}')" style="margin-top:1rem;background:#fff;color:#2563eb;border:none;border-radius:10px;padding:0.7rem 1.5rem;font-weight:700;cursor:pointer;">⬇️ Download</button></div>`;
+    content.innerHTML=`<div style="padding:2rem;color:#fff;text-align:center;"><div style="font-size:3rem;margin-bottom:1rem;">${docIcon(doc.type)}</div><p>${doc.name}</p><p style="margin-top:0.5rem;font-size:0.8rem;opacity:0.7;">Preview not available. Download to open.</p></div>`;
   }
   document.getElementById('docViewer').classList.add('show');
 }
@@ -1780,10 +1721,7 @@ function shareDoc(id){
 }
 function confirmDeleteDoc(id){
   showConfirm('Delete Document?','This document will be permanently removed.',()=>{
-    documents=documents.filter(d=>String(d.id)!==String(id));
-    saveDocs();renderDocs();showToast('🗑️ Removed!');
-    // Delete from Firebase too
-    if(userPhone&&db) db.ref('users/'+userPhone+'/docs/'+id).remove().catch(()=>{});
+    documents=documents.filter(d=>String(d.id)!==String(id));saveDocs();renderDocs();showToast('🗑️ Removed!');
   });
 }
 
@@ -2440,36 +2378,38 @@ function savePrayerReport(type){
   }
 }
 
-// PDF BOXES — Show uploaded documents
+// PDF LINK BOXES — Edit the URL in each box below to your Google Drive PDF link
+const PDF_DOCS = [
+  { name: 'Aadhar Card',        icon: '🪪', color: '#2563eb', url: '' },
+  { name: 'PAN Card',           icon: '💳', color: '#7c3aed', url: '' },
+  { name: 'Driving Licence',    icon: '🚗', color: '#059669', url: 'https://drive.google.com/file/d/1--qXacOfODD850fo19MX8M4t29XgsiHL/view?usp=drivesdk' },
+  { name: 'Passport',           icon: '📘', color: '#dc2626', url: '' },
+  { name: 'Bank Passbook',      icon: '🏦', color: '#d97706', url: '' },
+  { name: 'Insurance Policy',   icon: '🛡️', color: '#0891b2', url: '' },
+  { name: 'Property Document',  icon: '🏠', color: '#be185d', url: '' },
+  { name: 'Salary Slip',        icon: '💰', color: '#1d4ed8', url: '' },
+  { name: 'RC Book',            icon: '📋', color: '#9333ea', url: '' },
+  { name: 'Other Document',     icon: '📄', color: '#374151', url: '' },
+];
+
 function renderPdfBoxes(){
   const grid=document.getElementById('pdfBoxGrid');
   if(!grid)return;
-  if(!documents.length){
-    grid.innerHTML=`<div style="text-align:center;padding:3rem 1rem;color:#6b7280;">
-      <div style="font-size:3rem;margin-bottom:0.8rem;">📁</div>
-      <div style="font-weight:600;margin-bottom:0.4rem;">No documents yet</div>
-      <div style="font-size:0.8rem;">Profile menu → Add Document பண்ணுங்க</div>
-    </div>`;
-    return;
-  }
-  const colors=['#2563eb','#7c3aed','#059669','#dc2626','#d97706','#0891b2','#be185d','#1d4ed8','#9333ea','#374151'];
-  grid.innerHTML=documents.map((d,i)=>{
-    const color=colors[i%colors.length];
-    const icon=d.type.includes('pdf')?'📄':d.type.includes('image')?'🖼️':d.type.includes('word')?'📝':d.type.includes('sheet')?'📊':'📎';
-    const size=d.size<1048576?(d.size/1024).toFixed(1)+'KB':(d.size/1048576).toFixed(1)+'MB';
-    const date=new Date(d.added).toLocaleDateString('en-IN');
-    return`<div class="pdf-box" style="border-left:4px solid ${color};">
-      <div class="pdf-box-icon" style="background:${color}18;">${icon}</div>
-      <div class="pdf-box-body" onclick="viewDoc('${d.id}')" style="flex:1;cursor:pointer;">
-        <div class="pdf-box-name">${d.name}</div>
-        <div class="pdf-box-sub" style="color:${color};">${size} · ${date}</div>
+  grid.innerHTML=PDF_DOCS.map((doc,i)=>`
+    <div class="pdf-box" onclick="openPdfDoc(${i})" style="border-left:4px solid ${doc.color};">
+      <div class="pdf-box-icon" style="background:${doc.color}18;">${doc.icon}</div>
+      <div class="pdf-box-body">
+        <div class="pdf-box-name">${doc.name}</div>
+        <div class="pdf-box-sub" style="color:${doc.color};">${doc.url ? '📎 Tap to open PDF' : '🔗 Link not set'}</div>
       </div>
-      <div style="display:flex;gap:6px;align-items:center;">
-        <button onclick="downloadDoc('${d.id}')" style="background:none;border:none;font-size:1.2rem;cursor:pointer;padding:4px;">⬇️</button>
-        <button onclick="confirmDeleteDoc('${d.id}')" style="background:none;border:none;font-size:1.1rem;cursor:pointer;padding:4px;color:#dc2626;">✕</button>
-      </div>
-    </div>`;
-  }).join('');
+      <div class="pdf-box-arrow" style="color:${doc.color};">›</div>
+    </div>`).join('');
+}
+
+function openPdfDoc(i){
+  const doc=PDF_DOCS[i];
+  if(!doc.url){showToast('⚠️ '+doc.name+' link not set');return;}
+  window.open(doc.url,'_blank');
 }
 
 // ============================================================
