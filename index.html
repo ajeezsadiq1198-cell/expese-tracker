@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -613,6 +612,13 @@ html,body{width:100%;overflow-x:hidden;background:var(--bg);color:var(--text);fo
       <div style="background:linear-gradient(135deg,#2563eb,#1e40af);border-radius:14px;padding:1rem;color:#fff;margin-bottom:0.85rem;">
         <div style="font-size:0.7rem;opacity:0.8;font-weight:600;text-transform:uppercase;letter-spacing:0.07em;">Weekly Balance Tracker</div>
         <div style="font-size:0.72rem;opacity:0.75;margin-top:4px;" id="taskWeekLabel">Week: loading...</div>
+        <!-- Week Navigation -->
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-top:0.7rem;gap:0.5rem;">
+          <button onclick="changeWeekOffset(-1)" style="flex:1;padding:0.42rem 0.5rem;border:1.5px solid rgba(255,255,255,0.5);border-radius:9px;background:rgba(255,255,255,0.12);color:#fff;font-size:0.72rem;font-weight:700;cursor:pointer;font-family:Inter,sans-serif;">◀ Prev Week</button>
+          <button onclick="changeWeekOffset(0)" id="wkCurBtn" style="flex:1;padding:0.42rem 0.5rem;border:1.5px solid rgba(255,255,255,0.9);border-radius:9px;background:rgba(255,255,255,0.22);color:#fff;font-size:0.72rem;font-weight:700;cursor:pointer;font-family:Inter,sans-serif;">📅 This Week</button>
+          <button onclick="changeWeekOffset(1)" id="wkNxtBtn" style="flex:1;padding:0.42rem 0.5rem;border:1.5px solid rgba(255,255,255,0.5);border-radius:9px;background:rgba(255,255,255,0.12);color:#fff;font-size:0.72rem;font-weight:700;cursor:pointer;font-family:Inter,sans-serif;">Next Week ▶</button>
+        </div>
+        <div id="wkOffsetBadge" style="display:none;margin-top:0.5rem;text-align:center;font-size:0.66rem;background:rgba(255,200,0,0.25);border-radius:8px;padding:3px 8px;color:#fde68a;font-weight:600;">📋 Viewing Past Week — Read Only</div>
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:0.45rem;margin-bottom:0.85rem;">
         <button id="wkBtnImg" onclick="saveWeeklyReport('image')" style="padding:0.6rem 0.3rem;border:none;border-radius:10px;background:#2563eb;color:#fff;font-size:0.68rem;font-weight:600;cursor:pointer;font-family:Inter,sans-serif;">&#128444; Image</button>
@@ -1252,6 +1258,7 @@ const TASK_FIELDS=['IPPS BANK BALANCE','FEDERAL BANK BALANCE','CASH IN HAND','OU
 let weeklyData=JSON.parse(localStorage.getItem('exp_weekly')||'{}');
 let prayerData=JSON.parse(localStorage.getItem('exp_prayer')||'{}');
 var currentTaskTab='balance';
+var weekOffset=0; // 0=current week, -1=prev week, -2=2 weeks ago, etc.
 const PRAYER_DAYS=['MONDAY','TUESDAY','WEDNESDAY','THURSDAY','FRIDAY','SATURDAY','SUNDAY'];
 const PRAYER_NAMES=[
   ['THAHUJATH','FAJIR','ZUHR','ASR','MAGHRIB','ISHAH'],
@@ -1358,7 +1365,7 @@ function switchTab(name){
   if(name==='docs')renderPdfBoxes();
   if(name==='bank')renderBank();
   if(name==='outstanding')renderOutstanding();
-  if(name==='task')renderTaskPage();
+  if(name==='task'){weekOffset=0;renderTaskPage();}
 }
 
 // TYPE / FILTER
@@ -1978,19 +1985,22 @@ function shareOutstandingImage(){
 }
 
 // TASK - WEEKLY BALANCE TRACKER
-function getWeekKey(){
+function getWeekKey(offset){
+  offset = (offset !== undefined) ? offset : weekOffset;
   var now=new Date();
-  // Use local date parts to avoid UTC midnight shift issues
   var localDate=new Date(now.getFullYear(),now.getMonth(),now.getDate());
+  localDate.setDate(localDate.getDate() + offset * 7);
   var day=localDate.getDay(); // 0=Sun,1=Mon,...,6=Sat
   var diffToMon=(day===0)?6:day-1;
   var mon=new Date(localDate);mon.setDate(localDate.getDate()-diffToMon);
   var y=mon.getFullYear(),m=String(mon.getMonth()+1).padStart(2,'0'),d=String(mon.getDate()).padStart(2,'0');
   return y+'-'+m+'-'+d;
 }
-function getWeekLabel(){
+function getWeekLabel(offset){
+  offset = (offset !== undefined) ? offset : weekOffset;
   var now=new Date();
   var localDate=new Date(now.getFullYear(),now.getMonth(),now.getDate());
+  localDate.setDate(localDate.getDate() + offset * 7);
   var day=localDate.getDay();
   var diffToMon=(day===0)?6:day-1;
   var mon=new Date(localDate);mon.setDate(localDate.getDate()-diffToMon);
@@ -1998,7 +2008,41 @@ function getWeekLabel(){
   var fmt2=function(d){var y=d.getFullYear(),m=String(d.getMonth()+1).padStart(2,'0'),dd=String(d.getDate()).padStart(2,'0');return fmtDate(y+'-'+m+'-'+dd);};
   return fmt2(mon)+' to '+fmt2(sun);
 }
+function changeWeekOffset(val){
+  if(val === 0){
+    weekOffset = 0;
+  } else {
+    weekOffset += val;
+  }
+  // Don't allow future weeks beyond current
+  if(weekOffset > 0) weekOffset = 0;
+  updateWeekNavUI();
+  if(currentTaskTab === 'balance'){
+    renderTaskPage();
+  } else {
+    renderPrayerPage();
+  }
+}
+function updateWeekNavUI(){
+  var lbl=document.getElementById('taskWeekLabel');
+  if(lbl) lbl.textContent='Week: '+getWeekLabel();
+  var badge=document.getElementById('wkOffsetBadge');
+  var curBtn=document.getElementById('wkCurBtn');
+  var nxtBtn=document.getElementById('wkNxtBtn');
+  if(badge){
+    if(weekOffset < 0){
+      badge.style.display='block';
+      badge.textContent = weekOffset === -1 ? '📋 கடந்த week பார்க்கிறீர்கள் — Read Only' :
+                          '📋 '+Math.abs(weekOffset)+' weeks பழைய data — Read Only';
+    } else {
+      badge.style.display='none';
+    }
+  }
+  if(nxtBtn) nxtBtn.disabled = (weekOffset >= 0);
+  if(nxtBtn) nxtBtn.style.opacity = (weekOffset >= 0) ? '0.4' : '1';
+}
 function saveTaskField(dayIdx,field,val){
+  if(weekOffset < 0){ showToast('⚠️ Past week data edit பண்ண முடியாது!'); return; }
   var wk=getWeekKey();
   if(!weeklyData[wk])weeklyData[wk]={};
   if(!weeklyData[wk][dayIdx])weeklyData[wk][dayIdx]={};
@@ -2019,9 +2063,11 @@ function toggleDay(dayIdx){
   b.style.display=(b.style.display==='none')?'block':'none';
 }
 function renderTaskPage(){
+  updateWeekNavUI();
   var lbl=document.getElementById('taskWeekLabel');
   if(lbl)lbl.textContent='Week: '+getWeekLabel();
   var wk=getWeekKey();
+  var isReadOnly = weekOffset < 0;
   var wrap=document.getElementById('taskDaysList');
   var fmt2=function(n){return '\u20b9'+n.toLocaleString('en-IN',{maximumFractionDigits:0});};
   var html='';
@@ -2040,7 +2086,11 @@ function renderTaskPage(){
       var val=(d[f]!==undefined&&d[f]!==0)?d[f]:'';
       html+='<div class="task-field-row">';
       html+='<span class="task-field-label">'+f+'</span>';
-      html+='<input class="task-field-input" type="number" inputmode="decimal" placeholder="0" value="'+val+'" data-day="'+di+'" data-field="'+fi+'"/>';
+      if(isReadOnly){
+        html+='<span class="task-field-input" style="width:108px;text-align:right;display:inline-block;padding:0.28rem 0.45rem;font-size:0.82rem;font-weight:700;color:'+(val?'#2563eb':'#9ca3af')+';background:#f0f4ff;border-radius:8px;border:1.5px solid #dbeafe;">'+(val ? fmt2(parseFloat(val)) : '—')+'</span>';
+      } else {
+        html+='<input class="task-field-input" type="number" inputmode="decimal" placeholder="0" value="'+val+'" data-day="'+di+'" data-field="'+fi+'"/>';
+      }
       html+='</div>';
     }
     html+='<div class="task-total-row">';
@@ -2050,15 +2100,17 @@ function renderTaskPage(){
     html+='</div></div>';
   }
   wrap.innerHTML=html;
-  // attach events after render
-  var inputs=wrap.querySelectorAll('.task-field-input');
-  inputs.forEach(function(inp){
-    inp.addEventListener('input',function(){
-      var dayI=parseInt(this.getAttribute('data-day'));
-      var fieldI=parseInt(this.getAttribute('data-field'));
-      saveTaskField(dayI,TASK_FIELDS[fieldI],this.value);
+  // attach events after render (only for current week)
+  if(!isReadOnly){
+    var inputs=wrap.querySelectorAll('.task-field-input');
+    inputs.forEach(function(inp){
+      inp.addEventListener('input',function(){
+        var dayI=parseInt(this.getAttribute('data-day'));
+        var fieldI=parseInt(this.getAttribute('data-field'));
+        saveTaskField(dayI,TASK_FIELDS[fieldI],this.value);
+      });
     });
-  });
+  }
 }
 function shareWeeklyReport(){
   var wk=getWeekKey();
@@ -2185,6 +2237,7 @@ function switchTaskTab(tab){
     tb.style.background='#2563eb';tb.style.color='#fff';
     tp.style.background='transparent';tp.style.color='#6b7280';
     dl.style.display='block';pl.style.display='none';
+    renderTaskPage();
     // update export buttons
     document.getElementById('wkBtnImg').onclick=function(){saveWeeklyReport('image');};
     document.getElementById('wkBtnPdf').onclick=function(){saveWeeklyReport('pdf');};
@@ -2202,6 +2255,7 @@ function switchTaskTab(tab){
 }
 function getPrayerKey(){return getWeekKey();}
 function togglePrayer(dayIdx,prayerIdx){
+  if(weekOffset < 0){ showToast('⚠️ Past week prayer edit பண்ண முடியாது!'); return; }
   var wk=getPrayerKey();
   if(!prayerData[wk])prayerData[wk]={};
   if(!prayerData[wk][dayIdx])prayerData[wk][dayIdx]={};
@@ -2233,6 +2287,7 @@ function togglePrayerDay(dayIdx){
 }
 function renderPrayerPage(){
   var wk=getPrayerKey();
+  var isReadOnly = weekOffset < 0;
   var wrap=document.getElementById('prayerDaysList');
   var html='';
   for(var di=0;di<PRAYER_DAYS.length;di++){
@@ -2251,7 +2306,11 @@ function renderPrayerPage(){
       var checked=!!(d[p]);
       html+='<div class="prayer-row">';
       html+='<span class="prayer-name">'+p+'</span>';
-      html+='<div id="pcb-'+di+'-'+pi+'" class="prayer-cb'+(checked?' checked':'')+'" onclick="togglePrayer('+di+','+pi+')">'+(checked?'✓':'')+'</div>';
+      if(isReadOnly){
+        html+='<div class="prayer-cb'+(checked?' checked':'')+'" style="cursor:default;opacity:'+(checked?'1':'0.5')+';">'+(checked?'✓':'')+'</div>';
+      } else {
+        html+='<div id="pcb-'+di+'-'+pi+'" class="prayer-cb'+(checked?' checked':'')+'" onclick="togglePrayer('+di+','+pi+')">'+(checked?'✓':'')+'</div>';
+      }
       html+='</div>';
     }
     html+='</div></div>';
