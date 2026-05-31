@@ -618,7 +618,7 @@ html,body{width:100%;overflow-x:hidden;background:var(--bg);color:var(--text);fo
           <button onclick="changeWeekOffset(0)" id="wkCurBtn" style="flex:1;padding:0.42rem 0.5rem;border:1.5px solid rgba(255,255,255,0.9);border-radius:9px;background:rgba(255,255,255,0.22);color:#fff;font-size:0.72rem;font-weight:700;cursor:pointer;font-family:Inter,sans-serif;">📅 This Week</button>
           <button onclick="changeWeekOffset(1)" id="wkNxtBtn" style="flex:1;padding:0.42rem 0.5rem;border:1.5px solid rgba(255,255,255,0.5);border-radius:9px;background:rgba(255,255,255,0.12);color:#fff;font-size:0.72rem;font-weight:700;cursor:pointer;font-family:Inter,sans-serif;">Next Week ▶</button>
         </div>
-        <div id="wkOffsetBadge" style="display:none;margin-top:0.5rem;text-align:center;font-size:0.66rem;background:rgba(255,200,0,0.25);border-radius:8px;padding:3px 8px;color:#fde68a;font-weight:600;">📋 Viewing Past Week — Read Only</div>
+        <div id="wkOffsetBadge" style="display:none;margin-top:0.5rem;text-align:center;font-size:0.66rem;background:rgba(0,200,100,0.25);border-radius:8px;padding:3px 8px;color:#bbf7d0;font-weight:600;">📝 கடந்த week — Edit செய்யலாம்!</div>
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:0.45rem;margin-bottom:0.85rem;">
         <button id="wkBtnImg" onclick="saveWeeklyReport('image')" style="padding:0.6rem 0.3rem;border:none;border-radius:10px;background:#2563eb;color:#fff;font-size:0.68rem;font-weight:600;cursor:pointer;font-family:Inter,sans-serif;">&#128444; Image</button>
@@ -2032,8 +2032,8 @@ function updateWeekNavUI(){
   if(badge){
     if(weekOffset < 0){
       badge.style.display='block';
-      badge.textContent = weekOffset === -1 ? '📋 கடந்த week பார்க்கிறீர்கள் — Read Only' :
-                          '📋 '+Math.abs(weekOffset)+' weeks பழைய data — Read Only';
+      badge.textContent = weekOffset === -1 ? '📝 கடந்த week — Edit செய்யலாம்!' :
+                          '📝 '+Math.abs(weekOffset)+' weeks பழைய data — Edit செய்யலாம்!';
     } else {
       badge.style.display='none';
     }
@@ -2042,7 +2042,6 @@ function updateWeekNavUI(){
   if(nxtBtn) nxtBtn.style.opacity = (weekOffset >= 0) ? '0.4' : '1';
 }
 function saveTaskField(dayIdx,field,val){
-  if(weekOffset < 0){ showToast('⚠️ Past week data edit பண்ண முடியாது!'); return; }
   var wk=getWeekKey();
   if(!weeklyData[wk])weeklyData[wk]={};
   if(!weeklyData[wk][dayIdx])weeklyData[wk][dayIdx]={};
@@ -2067,7 +2066,6 @@ function renderTaskPage(){
   var lbl=document.getElementById('taskWeekLabel');
   if(lbl)lbl.textContent='Week: '+getWeekLabel();
   var wk=getWeekKey();
-  var isReadOnly = weekOffset < 0;
   var wrap=document.getElementById('taskDaysList');
   var fmt2=function(n){return '\u20b9'+n.toLocaleString('en-IN',{maximumFractionDigits:0});};
   var html='';
@@ -2086,11 +2084,7 @@ function renderTaskPage(){
       var val=(d[f]!==undefined&&d[f]!==0)?d[f]:'';
       html+='<div class="task-field-row">';
       html+='<span class="task-field-label">'+f+'</span>';
-      if(isReadOnly){
-        html+='<span class="task-field-input" style="width:108px;text-align:right;display:inline-block;padding:0.28rem 0.45rem;font-size:0.82rem;font-weight:700;color:'+(val?'#2563eb':'#9ca3af')+';background:#f0f4ff;border-radius:8px;border:1.5px solid #dbeafe;">'+(val ? fmt2(parseFloat(val)) : '—')+'</span>';
-      } else {
-        html+='<input class="task-field-input" type="number" inputmode="decimal" placeholder="0" value="'+val+'" data-day="'+di+'" data-field="'+fi+'"/>';
-      }
+      html+='<input class="task-field-input" type="number" inputmode="decimal" placeholder="0" value="'+val+'" data-day="'+di+'" data-field="'+fi+'"/>';
       html+='</div>';
     }
     html+='<div class="task-total-row">';
@@ -2100,17 +2094,14 @@ function renderTaskPage(){
     html+='</div></div>';
   }
   wrap.innerHTML=html;
-  // attach events after render (only for current week)
-  if(!isReadOnly){
-    var inputs=wrap.querySelectorAll('.task-field-input');
-    inputs.forEach(function(inp){
-      inp.addEventListener('input',function(){
-        var dayI=parseInt(this.getAttribute('data-day'));
-        var fieldI=parseInt(this.getAttribute('data-field'));
-        saveTaskField(dayI,TASK_FIELDS[fieldI],this.value);
-      });
+  var inputs=wrap.querySelectorAll('.task-field-input');
+  inputs.forEach(function(inp){
+    inp.addEventListener('input',function(){
+      var dayI=parseInt(this.getAttribute('data-day'));
+      var fieldI=parseInt(this.getAttribute('data-field'));
+      saveTaskField(dayI,TASK_FIELDS[fieldI],this.value);
     });
-  }
+  });
 }
 function shareWeeklyReport(){
   var wk=getWeekKey();
@@ -2255,7 +2246,6 @@ function switchTaskTab(tab){
 }
 function getPrayerKey(){return getWeekKey();}
 function togglePrayer(dayIdx,prayerIdx){
-  if(weekOffset < 0){ showToast('⚠️ Past week prayer edit பண்ண முடியாது!'); return; }
   var wk=getPrayerKey();
   if(!prayerData[wk])prayerData[wk]={};
   if(!prayerData[wk][dayIdx])prayerData[wk][dayIdx]={};
@@ -2287,7 +2277,6 @@ function togglePrayerDay(dayIdx){
 }
 function renderPrayerPage(){
   var wk=getPrayerKey();
-  var isReadOnly = weekOffset < 0;
   var wrap=document.getElementById('prayerDaysList');
   var html='';
   for(var di=0;di<PRAYER_DAYS.length;di++){
@@ -2306,11 +2295,7 @@ function renderPrayerPage(){
       var checked=!!(d[p]);
       html+='<div class="prayer-row">';
       html+='<span class="prayer-name">'+p+'</span>';
-      if(isReadOnly){
-        html+='<div class="prayer-cb'+(checked?' checked':'')+'" style="cursor:default;opacity:'+(checked?'1':'0.5')+';">'+(checked?'✓':'')+'</div>';
-      } else {
-        html+='<div id="pcb-'+di+'-'+pi+'" class="prayer-cb'+(checked?' checked':'')+'" onclick="togglePrayer('+di+','+pi+')">'+(checked?'✓':'')+'</div>';
-      }
+      html+='<div id="pcb-'+di+'-'+pi+'" class="prayer-cb'+(checked?' checked':'')+'" onclick="togglePrayer('+di+','+pi+')">'+(checked?'✓':'')+'</div>';
       html+='</div>';
     }
     html+='</div></div>';
