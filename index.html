@@ -1,3 +1,5 @@
+
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -307,48 +309,6 @@ html,body{width:100%;overflow-x:hidden;background:var(--bg);color:var(--text);fo
 
 #reportCanvas{display:none;}
 
-/* CRAFT PAGE */
-.craft-page{background:var(--bg);}
-.craft-hero{background:linear-gradient(135deg,#1e40af 0%,#2563eb 50%,#7c3aed 100%);padding:1.4rem 1rem 2.5rem;text-align:center;position:relative;overflow:hidden;}
-.craft-hero::before{content:'';position:absolute;top:-40px;right:-40px;width:160px;height:160px;background:rgba(255,255,255,0.07);border-radius:50%;}
-.craft-hero::after{content:'';position:absolute;bottom:-50px;left:-30px;width:130px;height:130px;background:rgba(255,255,255,0.05);border-radius:50%;}
-.craft-hero-name{font-size:1.15rem;font-weight:800;color:#fff;margin-bottom:2px;letter-spacing:0.02em;}
-.craft-hero-sub{font-size:0.68rem;color:rgba(255,255,255,0.72);margin-bottom:1.1rem;letter-spacing:0.06em;text-transform:uppercase;}
-.craft-hero-bal{font-size:2.4rem;font-weight:800;color:#fff;line-height:1.1;text-shadow:0 2px 12px rgba(0,0,0,0.18);}
-.craft-hero-bal-lbl{font-size:0.7rem;color:rgba(255,255,255,0.75);margin-top:3px;font-weight:600;letter-spacing:0.05em;}
-.craft-cards{display:grid;grid-template-columns:1fr 1fr;gap:0.65rem;padding:1rem 0.85rem 0.5rem;margin-top:-1.2rem;position:relative;z-index:2;}
-.craft-card{background:#fff;border-radius:16px;padding:1rem 0.85rem;box-shadow:0 4px 18px rgba(37,99,235,0.10);border:1px solid var(--border);}
-.craft-card-ico{font-size:1.4rem;margin-bottom:0.4rem;}
-.craft-card-lbl{font-size:0.6rem;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:var(--muted);margin-bottom:5px;}
-.craft-card-val{font-size:1.1rem;font-weight:800;}
-.craft-card-sub{font-size:0.6rem;color:var(--muted2);margin-top:3px;}
-.craft-card.inc .craft-card-val{color:var(--income);}
-.craft-card.exp .craft-card-val{color:var(--expense);}
-.craft-card.sav .craft-card-val{color:#7c3aed;}
-.craft-card.pray .craft-card-val{color:#059669;}
-.craft-section{background:#fff;border-radius:16px;margin:0.65rem 0.85rem;padding:1rem;box-shadow:0 2px 10px rgba(37,99,235,0.07);border:1px solid var(--border);}
-.craft-section-title{font-size:0.68rem;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:var(--muted);margin-bottom:0.85rem;display:flex;align-items:center;gap:6px;}
-.craft-bar-row{margin-bottom:0.75rem;}
-.craft-bar-label{display:flex;justify-content:space-between;margin-bottom:4px;align-items:center;}
-.craft-bar-name{font-size:0.78rem;font-weight:600;color:var(--text);}
-.craft-bar-val{font-size:0.75rem;font-weight:700;}
-.craft-bar-track{height:9px;background:var(--bg);border-radius:6px;overflow:hidden;border:1px solid var(--border);}
-.craft-bar-fill{height:100%;border-radius:6px;transition:width 0.6s ease;}
-.craft-week-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;text-align:center;}
-.craft-week-day{font-size:0.58rem;font-weight:700;color:var(--muted);margin-bottom:4px;text-transform:uppercase;}
-.craft-week-dot{width:32px;height:32px;border-radius:10px;margin:0 auto;display:flex;align-items:center;justify-content:center;font-size:0.8rem;font-weight:700;}
-.craft-week-dot.good{background:#d1fae5;color:#059669;}
-.craft-week-dot.bad{background:#fee2e2;color:#dc2626;}
-.craft-week-dot.empty{background:var(--bg);color:var(--muted2);}
-.craft-prayer-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:4px;}
-.craft-prayer-dot{background:var(--bg);border-radius:8px;padding:5px 2px;text-align:center;font-size:0.55rem;font-weight:700;color:var(--muted);}
-.craft-prayer-dot.done{background:#d1fae5;color:#059669;}
-.craft-share-row{display:grid;grid-template-columns:1fr 1fr;gap:0.5rem;padding:0 0.85rem 1.2rem;}
-.craft-share-btn{padding:0.78rem;border:none;border-radius:13px;font-size:0.82rem;font-weight:700;cursor:pointer;font-family:Inter,sans-serif;display:flex;align-items:center;justify-content:center;gap:6px;transition:opacity 0.18s;}
-.craft-share-btn:active{opacity:0.8;}
-.craft-refresh-btn{width:calc(100% - 1.7rem);margin:0 0.85rem 0.65rem;padding:0.72rem;border:1.5px solid var(--accent);border-radius:12px;background:#fff;color:var(--accent);font-size:0.82rem;font-weight:700;cursor:pointer;font-family:Inter,sans-serif;display:flex;align-items:center;justify-content:center;gap:6px;}
-
-
 /* LOGIN SCREEN */
 #pinScreen{position:fixed;inset:0;background:linear-gradient(160deg,#1e40af 0%,#2563eb 60%,#3b82f6 100%);z-index:10000;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:1.5rem;transition:opacity 0.15s;}
 #pinScreen.hide{display:none;}
@@ -519,7 +479,6 @@ html,body{width:100%;overflow-x:hidden;background:var(--bg);color:var(--text);fo
     </div>
     <div class="drawer-menu">
       <div class="drawer-item" onclick="closeProfile();switchTab('home')"><span class="di">🏠</span>Home</div>
-      <div class="drawer-item" onclick="closeProfile();switchTab('craft')"><span class="di">✨</span>My Craft Page</div>
       <div class="drawer-item" onclick="closeProfile();switchTab('add')"><span class="di">➕</span>Add Transaction</div>
       <div class="drawer-item" onclick="closeProfile();switchTab('stats')"><span class="di">📊</span>Analytics</div>
       <div class="drawer-item" onclick="closeProfile();switchTab('docs')"><span class="di">📁</span>Documents</div>
@@ -770,73 +729,6 @@ html,body{width:100%;overflow-x:hidden;background:var(--bg);color:var(--text);fo
         </div>
       </div>
 
-    </div>
-  </div>
-
-  <!-- CRAFT PAGE -->
-  <div class="page craft-page" id="page-craft">
-    <div class="craft-hero" id="craftHero">
-      <div class="craft-hero-name" id="craftName">My Finance</div>
-      <div class="craft-hero-sub" id="craftDate">Loading...</div>
-      <div class="craft-hero-bal" id="craftBal">₹0</div>
-      <div class="craft-hero-bal-lbl">Net Balance</div>
-    </div>
-    <div class="craft-cards">
-      <div class="craft-card inc">
-        <div class="craft-card-ico">💵</div>
-        <div class="craft-card-lbl">Total Income</div>
-        <div class="craft-card-val" id="craftInc">₹0</div>
-        <div class="craft-card-sub" id="craftIncCnt">0 entries</div>
-      </div>
-      <div class="craft-card exp">
-        <div class="craft-card-ico">💸</div>
-        <div class="craft-card-lbl">Total Expense</div>
-        <div class="craft-card-val" id="craftExp">₹0</div>
-        <div class="craft-card-sub" id="craftExpCnt">0 entries</div>
-      </div>
-      <div class="craft-card sav">
-        <div class="craft-card-ico">🏦</div>
-        <div class="craft-card-lbl">Savings</div>
-        <div class="craft-card-val" id="craftSav">₹0</div>
-        <div class="craft-card-sub" id="craftSavPct">0% saved</div>
-      </div>
-      <div class="craft-card pray">
-        <div class="craft-card-ico">🕌</div>
-        <div class="craft-card-lbl">Today's Prayer</div>
-        <div class="craft-card-val" id="craftPrayVal">0/6</div>
-        <div class="craft-card-sub" id="craftPraySub">Prayers done</div>
-      </div>
-    </div>
-
-    <!-- Expense by Category -->
-    <div class="craft-section">
-      <div class="craft-section-title"><span>📊</span> Expense Breakdown</div>
-      <div id="craftCatBars"><div style="text-align:center;color:var(--muted2);font-size:0.78rem;padding:0.5rem;">No expense data</div></div>
-    </div>
-
-    <!-- Weekly Balance -->
-    <div class="craft-section">
-      <div class="craft-section-title"><span>📅</span> This Week's Balance</div>
-      <div class="craft-week-grid" id="craftWeekGrid"></div>
-    </div>
-
-    <!-- Prayer Tracker -->
-    <div class="craft-section">
-      <div class="craft-section-title"><span>🕌</span> Today's Prayer Tracker</div>
-      <div class="craft-prayer-grid" id="craftPrayerGrid"></div>
-    </div>
-
-    <!-- Outstanding -->
-    <div class="craft-section" id="craftOutSection">
-      <div class="craft-section-title"><span>🔔</span> Outstanding Due</div>
-      <div id="craftOutContent"></div>
-    </div>
-
-    <button class="craft-refresh-btn" onclick="renderCraftPage()">🔄 Refresh</button>
-
-    <div class="craft-share-row">
-      <button class="craft-share-btn" style="background:#2563eb;color:#fff;" onclick="downloadCraftImage()">🖼️ Save Image</button>
-      <button class="craft-share-btn" style="background:#25d366;color:#fff;" onclick="shareCraftWhatsApp()">📤 WhatsApp</button>
     </div>
   </div>
 
@@ -1476,7 +1368,6 @@ function switchTab(name){
   if(name==='bank')renderBank();
   if(name==='outstanding')renderOutstanding();
   if(name==='task'){weekOffset=0;renderTaskPage();}
-  if(name==='craft')renderCraftPage();
 }
 
 // TYPE / FILTER
@@ -2939,138 +2830,7 @@ function updateTimeDisplay(h, m){
   el.textContent = period + ' ' + h12 + ':' + mStr + ' மணிக்கு alarm வரும்';
 }
 
-// ============================================================
-// CRAFT PAGE
-// ============================================================
-function renderCraftPage(){
-  const inc = transactions.filter(t=>t.type==='income').reduce((s,t)=>s+t.amount,0);
-  const exp = transactions.filter(t=>t.type==='expense').reduce((s,t)=>s+t.amount,0);
-  const bal = inc - exp;
-  const sav = Math.max(0, bal);
-  const savPct = inc > 0 ? Math.round((sav/inc)*100) : 0;
-
-  // Hero
-  const name = profileData.name || 'My Finance';
-  const now = new Date();
-  const days = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
-  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-  document.getElementById('craftName').textContent = name + "'s Finance";
-  document.getElementById('craftDate').textContent = days[now.getDay()] + ', ' + now.getDate() + ' ' + months[now.getMonth()] + ' ' + now.getFullYear();
-  document.getElementById('craftBal').textContent = fmt(bal);
-  document.getElementById('craftBal').style.color = bal >= 0 ? '#fff' : '#fca5a5';
-
-  // Cards
-  document.getElementById('craftInc').textContent = fmt(inc);
-  document.getElementById('craftIncCnt').textContent = transactions.filter(t=>t.type==='income').length + ' entries';
-  document.getElementById('craftExp').textContent = fmt(exp);
-  document.getElementById('craftExpCnt').textContent = transactions.filter(t=>t.type==='expense').length + ' entries';
-  document.getElementById('craftSav').textContent = fmt(sav);
-  document.getElementById('craftSavPct').textContent = savPct + '% saved';
-
-  // Today's prayer
-  const todayKey = now.toISOString().split('T')[0];
-  const prayNames = ['THAHUJATH','FAJIR','ZUHR','ASR','MAGHRIB','ISHAH'];
-  const todayPrayer = (prayerData && prayerData[todayKey]) ? prayerData[todayKey] : {};
-  const prayDone = prayNames.filter(p => todayPrayer[p]).length;
-  document.getElementById('craftPrayVal').textContent = prayDone + '/6';
-  document.getElementById('craftPraySub').textContent = prayDone === 6 ? '✅ All done!' : prayDone + ' of 6 done';
-
-  // Category breakdown
-  const catMap = {};
-  transactions.filter(t=>t.type==='expense').forEach(t=>{
-    catMap[t.category] = (catMap[t.category]||0) + t.amount;
-  });
-  const cats = Object.entries(catMap).sort((a,b)=>b[1]-a[1]).slice(0,5);
-  const maxCat = cats.length ? cats[0][1] : 1;
-  const catColors = ['#2563eb','#7c3aed','#dc2626','#d97706','#059669'];
-  document.getElementById('craftCatBars').innerHTML = cats.length ? cats.map(([cat,val],i)=>`
-    <div class="craft-bar-row">
-      <div class="craft-bar-label">
-        <span class="craft-bar-name">${ICONS[cat]||'📌'} ${cat}</span>
-        <span class="craft-bar-val" style="color:${catColors[i%5]}">${fmt(val)}</span>
-      </div>
-      <div class="craft-bar-track"><div class="craft-bar-fill" style="width:${Math.round((val/maxCat)*100)}%;background:${catColors[i%5]};"></div></div>
-    </div>`).join('') : '<div style="text-align:center;color:var(--muted2);font-size:0.78rem;padding:0.5rem;">No expense data</div>';
-
-  // Weekly balance grid
-  const weekDayShort = ['SUN','MON','TUE','WED','THU','FRI','SAT'];
-  const weekStart = new Date(now);
-  weekStart.setDate(now.getDate() - now.getDay());
-  let weekHTML = weekDayShort.map(d=>`<div class="craft-week-day">${d}</div>`).join('');
-  for(let i=0;i<7;i++){
-    const d = new Date(weekStart); d.setDate(weekStart.getDate()+i);
-    const dKey = d.toISOString().split('T')[0];
-    const wkInc = transactions.filter(t=>t.date===dKey&&t.type==='income').reduce((s,t)=>s+t.amount,0);
-    const wkExp = transactions.filter(t=>t.date===dKey&&t.type==='expense').reduce((s,t)=>s+t.amount,0);
-    const wkBal = wkInc - wkExp;
-    const isToday = dKey === todayKey;
-    const hasTx = transactions.some(t=>t.date===dKey);
-    let dotClass = 'empty', dotTxt = d.getDate();
-    if(hasTx){ dotClass = wkBal >= 0 ? 'good' : 'bad'; }
-    const border = isToday ? 'outline:2px solid #2563eb;outline-offset:2px;' : '';
-    weekHTML += `<div class="craft-week-dot ${dotClass}" style="${border}" title="${dKey}">${dotTxt}</div>`;
-  }
-  document.getElementById('craftWeekGrid').innerHTML = weekHTML;
-
-  // Prayer tracker for today
-  const prayerEmojis = ['🌙','🌅','☀️','🌤️','🌇','🌃'];
-  document.getElementById('craftPrayerGrid').innerHTML = prayNames.map((p,i)=>{
-    const done = !!todayPrayer[p];
-    return `<div class="craft-prayer-dot ${done?'done':''}">
-      <div style="font-size:1rem;margin-bottom:2px;">${done?'✅':prayerEmojis[i]}</div>
-      <div>${p.slice(0,3)}</div>
-    </div>`;
-  }).join('');
-
-  // Outstanding
-  const outTotal = outstanding.reduce((s,o)=>s+(o.mode==='add'?o.amount:-o.amount),0);
-  const outEl = document.getElementById('craftOutContent');
-  if(outstanding.length){
-    outEl.innerHTML = `
-      <div style="display:flex;justify-content:space-between;align-items:center;background:#fef2f2;border-radius:10px;padding:0.7rem 0.85rem;margin-bottom:0.5rem;">
-        <span style="font-size:0.82rem;font-weight:600;color:#dc2626;">Total Outstanding</span>
-        <span style="font-size:1rem;font-weight:800;color:#dc2626;">${fmt(Math.abs(outTotal))}</span>
-      </div>
-      ${outstanding.slice(0,3).map(o=>`
-        <div style="display:flex;justify-content:space-between;padding:0.35rem 0;border-bottom:1px solid var(--border);">
-          <span style="font-size:0.8rem;font-weight:500;">${o.name} — ${o.desc}</span>
-          <span style="font-size:0.8rem;font-weight:700;color:${o.mode==='add'?'#dc2626':'#16a34a'}">${o.mode==='add'?'+':'-'}${fmt(o.amount)}</span>
-        </div>`).join('')}
-      ${outstanding.length > 3 ? `<div style="font-size:0.68rem;color:var(--muted);text-align:center;margin-top:4px;">+${outstanding.length-3} more</div>` : ''}`;
-  } else {
-    outEl.innerHTML = '<div style="text-align:center;color:var(--muted2);font-size:0.78rem;padding:0.3rem;">No outstanding dues 🎉</div>';
-  }
-}
-
-function shareCraftWhatsApp(){
-  const inc = transactions.filter(t=>t.type==='income').reduce((s,t)=>s+t.amount,0);
-  const exp = transactions.filter(t=>t.type==='expense').reduce((s,t)=>s+t.amount,0);
-  const sav = Math.max(0, inc-exp);
-  const name = profileData.name || 'My Finance';
-  const now = new Date();
-  const dateStr = now.getDate() + '/' + (now.getMonth()+1) + '/' + now.getFullYear();
-  const prayNames = ['THAHUJATH','FAJIR','ZUHR','ASR','MAGHRIB','ISHAH'];
-  const todayKey = now.toISOString().split('T')[0];
-  const todayPrayer = (prayerData && prayerData[todayKey]) ? prayerData[todayKey] : {};
-  const prayDone = prayNames.filter(p=>todayPrayer[p]).length;
-
-  let text = `✨ *${name}'s Finance Report*\n📅 ${dateStr}\n\n`;
-  text += `💰 *Balance:* ${fmt(inc-exp)}\n`;
-  text += `💵 *Income:* ${fmt(inc)}\n`;
-  text += `💸 *Expense:* ${fmt(exp)}\n`;
-  text += `🏦 *Savings:* ${fmt(sav)} (${inc>0?Math.round((sav/inc)*100):0}%)\n`;
-  text += `🕌 *Today Prayer:* ${prayDone}/6\n\n`;
-  text += `_Generated by Expense Tracker_`;
-  const wa = 'https://api.whatsapp.com/send?text=' + encodeURIComponent(text);
-  window.open(wa, '_blank');
-}
-
-function downloadCraftImage(){
-  renderCraftPage();
-  showToast('📸 Screenshot எடுத்து save பண்ணுங்க!');
-}
-
-
+function getReminderHour(){
   const t = localStorage.getItem('exp_reminder_time') || '23:00';
   return parseInt(t.split(':')[0]);
 }
